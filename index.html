@@ -1,0 +1,1973 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Seiva Aromas — gestão</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/prop-types/prop-types.min.js"></script>
+<script src="https://unpkg.com/react-is@18/umd/react-is.production.min.js"></script>
+<script src="https://unpkg.com/recharts@2.12.7/umd/Recharts.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/@babel/standalone@7.24.7/babel.min.js"></script>
+<style>
+  html, body { margin: 0; background: #000; }
+  #root:empty::before {
+    content: 'Carregando o sistema — se isso não sumir em alguns segundos, veja o Console (F12) para o erro.';
+    color: #888; font-family: monospace; font-size: 13px; display: block; padding: 24px;
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+  window.addEventListener('error', function (e) {
+    var root = document.getElementById('root');
+    root.innerHTML = '<div style="color:#fff;background:#000;font-family:monospace;padding:24px;white-space:pre-wrap;">'
+      + '⚠ Erro ao carregar o sistema:\n\n' + (e.message || e) + '\n\nArquivo: ' + (e.filename || '-') + ':' + (e.lineno || '-')
+      + '\n\nIsso costuma acontecer quando algum script externo (CDN) não carregou — verifique sua conexão com a internet e tente recarregar a página.'
+      + '</div>';
+  });
+</script>
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useMemo } = React;
+const {
+  LineChart, Line, BarChart, Bar, AreaChart, Area, PieChart, Pie, Cell, XAxis, YAxis,
+  CartesianGrid, Tooltip, ResponsiveContainer, Legend
+} = Recharts;
+
+// =====================================================================
+// CONFIGURAÇÃO DO SUPABASE — cole aqui a URL e a chave anon do seu projeto
+// Painel do Supabase → Project Settings → API
+// =====================================================================
+const SUPABASE_URL = 'https://hvbvwoebawijnrwadomc.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_xg2s2s51cwMofaTEILj6QQ_XtDmPPWM';
+
+const CONFIG_OK = /^https?:\/\//.test(SUPABASE_URL) && SUPABASE_ANON_KEY && SUPABASE_ANON_KEY.length > 20 && SUPABASE_ANON_KEY.indexOf('COLE_AQUI') === -1;
+const sb = CONFIG_OK ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+
+// Loja única compartilhada — todos os logins autenticados leem/gravam neste mesmo registro,
+// em vez de cada login ter os próprios dados isolados.
+const SHARED_STORE_ID = 'f9d8820d-b6bd-42fe-b12e-8fa73c1d01f2';
+
+function Icon({ children, size = 16, ...props }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      {children}
+    </svg>
+  );
+}
+const LayoutDashboard = (p) => <Icon {...p}><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></Icon>;
+const Package = (p) => <Icon {...p}><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><polyline points="3.29 7 12 12 20.71 7"/><line x1="12" y1="22" x2="12" y2="12"/></Icon>;
+const Users = (p) => <Icon {...p}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></Icon>;
+const Boxes = (p) => <Icon {...p}><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="8" rx="1"/><rect x="8" y="13" width="8" height="8" rx="1"/></Icon>;
+const ShoppingCart = (p) => <Icon {...p}><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></Icon>;
+const Truck = (p) => <Icon {...p}><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></Icon>;
+const DollarSign = (p) => <Icon {...p}><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></Icon>;
+const ClipboardList = (p) => <Icon {...p}><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><line x1="8" y1="11" x2="16" y2="11"/><line x1="8" y1="15" x2="16" y2="15"/></Icon>;
+const BarChart3 = (p) => <Icon {...p}><path d="M3 3v18h18"/><rect x="7" y="13" width="3" height="5"/><rect x="12" y="9" width="3" height="9"/><rect x="17" y="5" width="3" height="13"/></Icon>;
+const AlertTriangle = (p) => <Icon {...p}><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></Icon>;
+const Plus = (p) => <Icon {...p}><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></Icon>;
+const Trash2 = (p) => <Icon {...p}><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></Icon>;
+const Pencil = (p) => <Icon {...p}><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></Icon>;
+const X = (p) => <Icon {...p}><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></Icon>;
+const Check = (p) => <Icon {...p}><polyline points="20 6 9 17 4 12"/></Icon>;
+const TrendingUp = (p) => <Icon {...p}><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></Icon>;
+const TrendingDown = (p) => <Icon {...p}><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></Icon>;
+const Calculator = (p) => <Icon {...p}><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10.5" x2="8.01" y2="10.5"/><line x1="12" y1="10.5" x2="12.01" y2="10.5"/><line x1="16" y1="10.5" x2="16.01" y2="10.5"/><line x1="8" y1="14.5" x2="8.01" y2="14.5"/><line x1="12" y1="14.5" x2="12.01" y2="14.5"/><line x1="16" y1="14.5" x2="16.01" y2="14.5"/><line x1="8" y1="18.5" x2="8.01" y2="18.5"/><line x1="12" y1="18.5" x2="12.01" y2="18.5"/><line x1="16" y1="18.5" x2="16.01" y2="18.5"/></Icon>;
+const ImageIcon = (p) => <Icon {...p}><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></Icon>;
+const TagIcon = (p) => <Icon {...p}><path d="M20.59 13.41 11 3.83 3.83 11 13.41 20.59a2 2 0 0 0 2.83 0l4.35-4.35a2 2 0 0 0 0-2.83Z"/><circle cx="7.5" cy="7.5" r="1.5"/></Icon>;
+const MessageCircle = (p) => <Icon {...p}><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></Icon>;
+
+
+const MONTHS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+
+function uid(prefix = 'id') {
+  return prefix + '_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7);
+}
+function formatBRL(v) {
+  const n = Number(v) || 0;
+  return 'R$ ' + n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function todayISO() { return new Date().toISOString().slice(0, 10); }
+function monthKey(dateStr) { return (dateStr || '').slice(0, 7); }
+function monthLabel(mk) {
+  if (!mk) return '';
+  const [y, m] = mk.split('-');
+  return MONTHS[parseInt(m, 10) - 1] + '/' + y.slice(2);
+}
+function emptyData() {
+  return { products: [], clients: [], sales: [], purchases: [], finance: [], orders: [], pricingCosts: [], pricingMargin: 100, catalogSettings: { whatsappNumber: '', storeName: '', logoUrl: '', tagline: '', welcomeMessage: 'Aproveite nosso catálogo com as últimas novidades.' } };
+}
+
+const NAV = [
+  { key: 'dashboard', label: 'Painel', icon: LayoutDashboard },
+  { key: 'products', label: 'Produtos', icon: Package },
+  { key: 'clients', label: 'Clientes', icon: Users },
+  { key: 'stock', label: 'Estoque', icon: Boxes },
+  { key: 'sales', label: 'Vendas', icon: ShoppingCart },
+  { key: 'purchases', label: 'Compras', icon: Truck },
+  { key: 'pricing', label: 'Precificação', icon: Calculator },
+  { key: 'finance', label: 'Financeiro', icon: DollarSign },
+  { key: 'expenses', label: 'Saídas', icon: TrendingDown },
+  { key: 'orders', label: 'Pedidos', icon: ClipboardList },
+  { key: 'catalog', label: 'Catálogo', icon: ImageIcon },
+  { key: 'coupons', label: 'Cupons', icon: TagIcon },
+  { key: 'reports', label: 'Relatórios', icon: BarChart3 },
+];
+
+function Fonts() {
+  return (
+    <style>{`
+      @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
+      .fw-display { font-family: 'Poppins', sans-serif; }
+      .fw-logo { font-family: 'Poppins', sans-serif; font-weight: 700; letter-spacing: -0.01em; }
+      .fw-mono { font-family: 'Poppins', sans-serif; font-variant-numeric: tabular-nums; }
+      .fw-body { font-family: 'Poppins', sans-serif; }
+      .fw-input {
+        background: #ffffff; border: 1px solid #E2E5EC; color: #0F172A;
+        border-radius: 8px; padding: 8px 11px; font-size: 13px; outline: none;
+      }
+      .fw-input:focus { border-color: #6C5BFF; box-shadow: 0 0 0 3px rgba(108,91,255,0.12); }
+      .fw-input option { color: #0F172A; background: #ffffff; }
+      .fw-btn {
+        background: #6C5BFF; color: #ffffff; font-weight: 500; font-size: 13px;
+        padding: 8px 16px; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px;
+        border: none;
+      }
+      .fw-btn:hover { background: #5A4AE0; }
+      .fw-btn-ghost {
+        background: transparent; border: 1px solid #E2E5EC; color: #475569;
+        padding: 7px 14px; border-radius: 8px; font-size: 13px; display: inline-flex; align-items: center; gap: 6px;
+      }
+      .fw-btn-ghost:hover { border-color: #6C5BFF; color: #6C5BFF; }
+      .fw-table th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: #94A3B8; padding: 9px 10px; border-bottom: 1px solid #EEF0F5; }
+      .fw-table td { padding: 9px 10px; border-bottom: 1px solid #F3F4F8; font-size: 13px; color: #1E293B; }
+      .fw-table tr:hover td { background: #F8F9FC; }
+    `}</style>
+  );
+}
+
+// ====================================================================
+// MARCA — troque aqui quando a logo chegar.
+// Cole a logo como link (https://...) ou como data:image/png;base64,...
+// Enquanto estiver vazia, o nome da loja aparece escrito no lugar.
+// ====================================================================
+const BRAND_NAME = 'Seiva Aromas';
+const BRAND_LOGO_DARK = '';   // versão da logo para fundo escuro (menu e login)
+const BRAND_LOGO_LIGHT = '';  // versão da logo para fundo claro
+const SINGLE_SIZE = 'Único';  // tamanho usado quando o produto não tem tamanhos
+
+function BrandMark({ variant = 'dark', height = 'h-6', fontSize = 18 }) {
+  const src = variant === 'dark' ? BRAND_LOGO_DARK : BRAND_LOGO_LIGHT;
+  if (src) return <img src={src} alt={BRAND_NAME} className={`${height} w-auto`} />;
+  return <span style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 700, fontSize: fontSize + 'px', letterSpacing: '-0.01em', color: variant === 'dark' ? '#ffffff' : '#0F172A' }}>{BRAND_NAME}</span>;
+}
+function variantLabel(color, size) { return size && size !== SINGLE_SIZE ? `${color}/${size}` : color; }
+
+// ---------- Reusable small components ----------
+function Field({ label, children }) {
+  return (
+    <label className="flex flex-col gap-1 text-xs text-slate-500">
+      {label}
+      {children}
+    </label>
+  );
+}
+
+function StatCard({ label, value, sub, tone = 'default', alert = false }) {
+  return (
+    <div className={`bg-white rounded-[10px] border px-4 py-3.5 flex-1 min-w-[160px] ${alert ? 'border-red-200' : 'border-slate-200'}`}>
+      <div className="text-[11.5px] text-slate-500 fw-body mb-1.5 flex items-center gap-1">
+        {alert && <AlertTriangle size={12} className="text-red-500" />} {label}
+      </div>
+      <div className={`fw-mono text-[19px] font-semibold ${alert ? 'text-red-600' : 'text-slate-900'}`}>{value}</div>
+      {sub && <div className="text-[11px] text-slate-400 mt-1">{sub}</div>}
+    </div>
+  );
+}
+
+function Section({ title, action, children }) {
+  return (
+    <div className="mb-7">
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="fw-display text-[15px] font-semibold text-slate-800">{title}</h2>
+        {action}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+const PIE_COLORS = ['#ffffff', '#525252'];
+
+// ---------- App ----------
+function App({ sb, session, onSignOut }) {
+  const [data, setData] = useState(null);
+  const [tab, setTab] = useState('dashboard');
+  const [saveState, setSaveState] = useState('idle');
+  const [publishState, setPublishState] = useState('idle');
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data: row, error } = await sb
+          .from('store_data')
+          .select('data')
+          .eq('user_id', SHARED_STORE_ID)
+          .maybeSingle();
+        if (error) throw error;
+        setData(row && row.data && Object.keys(row.data).length ? { ...emptyData(), ...row.data } : emptyData());
+      } catch (e) {
+        console.error('Erro ao carregar dados:', e);
+        setData(emptyData());
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (data === null) return;
+    setSaveState('saving');
+    const t = setTimeout(async () => {
+      try {
+        const { error } = await sb
+          .from('store_data')
+          .upsert({ user_id: SHARED_STORE_ID, data, updated_at: new Date().toISOString() });
+        if (error) throw error;
+        setSaveState('saved');
+      } catch (e) {
+        console.error('Erro ao salvar dados:', e);
+        setSaveState('error');
+      }
+    }, 500);
+    return () => clearTimeout(t);
+  }, [data]);
+
+  // ---- derived (must run on every render, even while data is still loading) ----
+  const safeData = data || emptyData();
+  const lowStock = useMemo(() => {
+    const list = [];
+    safeData.products.forEach(p => {
+      p.variants.forEach(v => {
+        if (v.stock <= (p.minStock ?? 3)) list.push({ product: p.name, color: v.color, size: v.size, stock: v.stock, min: p.minStock ?? 3, productId: p.id });
+      });
+    });
+    return list;
+  }, [safeData.products]);
+
+  const thisMonth = monthKey(todayISO());
+  const salesThisMonth = useMemo(() => safeData.sales.filter(s => monthKey(s.date) === thisMonth), [safeData.sales, thisMonth]);
+  const revenueThisMonth = salesThisMonth.reduce((s, x) => s + x.total, 0);
+  const profitThisMonth = salesThisMonth.reduce((s, x) => s + x.profit, 0);
+  const pendingOrders = safeData.orders.filter(o => o.status === 'pendente').length;
+
+  const revenueByMonth = useMemo(() => {
+    const map = {};
+    safeData.sales.forEach(s => { const mk = monthKey(s.date); map[mk] = (map[mk] || 0) + s.total; });
+    return Object.entries(map).sort(([a], [b]) => a.localeCompare(b)).slice(-6).map(([mk, v]) => ({ month: monthLabel(mk), receita: Math.round(v * 100) / 100 }));
+  }, [safeData.sales]);
+
+  const salesByType = useMemo(() => {
+    const varejo = safeData.sales.filter(s => s.type === 'varejo').reduce((s, x) => s + x.total, 0);
+    const atacado = safeData.sales.filter(s => s.type === 'atacado').reduce((s, x) => s + x.total, 0);
+    return [{ name: 'Varejo', value: varejo }, { name: 'Atacado', value: atacado }].filter(x => x.value > 0);
+  }, [safeData.sales]);
+
+  const cashFlow = useMemo(() => {
+    const sorted = [...safeData.finance].sort((a, b) => a.date.localeCompare(b.date));
+    let bal = 0;
+    return sorted.map(f => { bal += f.type === 'entrada' ? f.value : -f.value; return { date: f.date.slice(5), saldo: Math.round(bal * 100) / 100 }; });
+  }, [safeData.finance]);
+
+  const prevMonthKey = (() => {
+    const [y, m] = thisMonth.split('-').map(Number);
+    const d = new Date(y, m - 2, 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  })();
+  const salesPrevMonth = useMemo(() => safeData.sales.filter(s => monthKey(s.date) === prevMonthKey), [safeData.sales, prevMonthKey]);
+  const revenuePrevMonth = salesPrevMonth.reduce((s, x) => s + x.total, 0);
+  const profitPrevMonth = salesPrevMonth.reduce((s, x) => s + x.profit, 0);
+  const pctChange = (curr, prev) => (prev ? Math.round(((curr - prev) / Math.abs(prev)) * 100) : null);
+  const revenueChangePct = pctChange(revenueThisMonth, revenuePrevMonth);
+  const profitChangePct = pctChange(profitThisMonth, profitPrevMonth);
+
+  const salesByCategory = useMemo(() => {
+    const map = {};
+    safeData.sales.forEach(sale => {
+      (sale.items || []).forEach(item => {
+        const product = safeData.products.find(p => p.id === item.productId);
+        const cat = (product && product.category) || 'Outros';
+        map[cat] = (map[cat] || 0) + item.price * item.qty;
+      });
+    });
+    const total = Object.values(map).reduce((a, b) => a + b, 0);
+    return Object.entries(map)
+      .sort((a, b) => b[1] - a[1]).slice(0, 4)
+      .map(([name, value]) => ({ name, value, pct: total ? Math.round((value / total) * 100) : 0 }));
+  }, [safeData.sales, safeData.products]);
+
+  const recentSales = useMemo(() => (
+    [...safeData.sales].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 4)
+  ), [safeData.sales]);
+
+  if (data === null) {
+    return (
+      <div className="min-h-screen flex items-center justify-center fw-mono text-sm" style={{ backgroundColor: '#0F172A', color: '#94A3B8' }}>
+        carregando sistema...
+      </div>
+    );
+  }
+
+  // ---- mutations ----
+  const addProduct = (p) => setData(d => ({ ...d, products: [...d.products, p] }));
+  const updateProduct = (id, patch) => setData(d => ({ ...d, products: d.products.map(p => p.id === id ? { ...p, ...patch } : p) }));
+  const deleteProduct = (id) => setData(d => ({ ...d, products: d.products.filter(p => p.id !== id) }));
+  const setVariantStock = (productId, color, size, stock) => setData(d => ({
+    ...d,
+    products: d.products.map(p => p.id !== productId ? p : {
+      ...p, variants: p.variants.map(v => v.color === color && v.size === size ? { ...v, stock: Math.max(0, Number(stock) || 0) } : v)
+    })
+  }));
+
+  const addClient = (c) => setData(d => ({ ...d, clients: [...d.clients, c] }));
+  const deleteClient = (id) => setData(d => ({ ...d, clients: d.clients.filter(c => c.id !== id) }));
+
+  const registerSale = (sale) => {
+    setData(d => {
+      const products = d.products.map(p => ({ ...p, variants: p.variants.map(v => ({ ...v })) }));
+      let costTotal = 0;
+      sale.items.forEach(item => {
+        const prod = products.find(p => p.id === item.productId);
+        if (prod) {
+          const variant = prod.variants.find(v => v.color === item.color && v.size === item.size);
+          if (variant) variant.stock = Math.max(0, variant.stock - item.qty);
+          costTotal += (prod.cost || 0) * item.qty;
+        }
+      });
+      const total = sale.items.reduce((s, i) => s + i.price * i.qty, 0);
+      const financeId = uid('fin');
+      const client = d.clients.find(c => c.id === sale.clientId);
+      const newSale = { ...sale, id: uid('sale'), total, costTotal, profit: total - costTotal, financeId };
+      const financeEntry = {
+        id: financeId, date: sale.date, type: 'entrada', category: 'venda',
+        desc: `Venda${client ? ' - ' + client.name : ''} (${sale.type})`, value: total, auto: true
+      };
+      return { ...d, products, sales: [...d.sales, newSale], finance: [...d.finance, financeEntry] };
+    });
+  };
+  const deleteSale = (id) => setData(d => {
+    const sale = d.sales.find(s => s.id === id);
+    if (!sale) return d;
+    const products = d.products.map(p => ({ ...p, variants: p.variants.map(v => ({ ...v })) }));
+    sale.items.forEach(item => {
+      const prod = products.find(p => p.id === item.productId);
+      if (prod) {
+        const variant = prod.variants.find(v => v.color === item.color && v.size === item.size);
+        if (variant) variant.stock += item.qty;
+      }
+    });
+    return { ...d, products, sales: d.sales.filter(s => s.id !== id), finance: d.finance.filter(f => f.id !== sale.financeId) };
+  });
+
+  const registerPurchase = (purchase) => {
+    setData(d => {
+      const products = d.products.map(p => ({ ...p, variants: p.variants.map(v => ({ ...v })) }));
+      purchase.items.forEach(item => {
+        const prod = products.find(p => p.id === item.productId);
+        if (prod) {
+          const variant = prod.variants.find(v => v.color === item.color && v.size === item.size);
+          if (variant) variant.stock += item.qty;
+        }
+      });
+      const total = purchase.items.reduce((s, i) => s + i.cost * i.qty, 0);
+      const financeId = uid('fin');
+      const newPurchase = { ...purchase, id: uid('purch'), total, financeId };
+      const financeEntry = { id: financeId, date: purchase.date, type: 'saida', category: 'compra', desc: `Compra - ${purchase.supplier}`, value: total, auto: true };
+      return { ...d, products, purchases: [...d.purchases, newPurchase], finance: [...d.finance, financeEntry] };
+    });
+  };
+  const deletePurchase = (id) => setData(d => {
+    const purchase = d.purchases.find(p => p.id === id);
+    if (!purchase) return d;
+    const products = d.products.map(p => ({ ...p, variants: p.variants.map(v => ({ ...v })) }));
+    purchase.items.forEach(item => {
+      const prod = products.find(p => p.id === item.productId);
+      if (prod) {
+        const variant = prod.variants.find(v => v.color === item.color && v.size === item.size);
+        if (variant) variant.stock = Math.max(0, variant.stock - item.qty);
+      }
+    });
+    return { ...d, products, purchases: d.purchases.filter(p => p.id !== id), finance: d.finance.filter(f => f.id !== purchase.financeId) };
+  });
+
+  const addFinance = (entry) => setData(d => ({ ...d, finance: [...d.finance, { ...entry, id: uid('fin'), auto: false }] }));
+  const deleteFinance = (id) => setData(d => ({ ...d, finance: d.finance.filter(f => f.id !== id) }));
+
+  const addOrder = (order) => setData(d => ({ ...d, orders: [...d.orders, { ...order, id: uid('order') }] }));
+  const updateOrderStatus = (id, status) => setData(d => ({ ...d, orders: d.orders.map(o => o.id === id ? { ...o, status } : o) }));
+  const deleteOrder = (id) => setData(d => ({ ...d, orders: d.orders.filter(o => o.id !== id) }));
+
+  const addPricingCost = (cost) => setData(d => ({ ...d, pricingCosts: [...d.pricingCosts, { ...cost, id: uid('cost') }] }));
+  const deletePricingCost = (id) => setData(d => ({ ...d, pricingCosts: d.pricingCosts.filter(c => c.id !== id) }));
+  const setPricingMargin = (value) => setData(d => ({ ...d, pricingMargin: value }));
+  const applyPrice = (productId, field, price) => updateProduct(productId, { [field]: Math.round(price * 100) / 100 });
+
+  const updateCatalogSettings = (patch) => setData(d => ({ ...d, catalogSettings: { ...d.catalogSettings, ...patch } }));
+  const publishCatalog = async () => {
+    setPublishState('publishing');
+    try {
+      const snapshot = data.products.map(p => ({
+        id: p.id, name: p.name, category: p.category,
+        photos: p.photos || [], price: p.retail || 0,
+        description: p.description || '', notes: p.notes || '',
+        variants: (p.variants || []).map(v => ({ color: v.color, size: v.size, inStock: v.stock > 0 })),
+      }));
+      const { error } = await sb.from('catalog_public').upsert({
+        user_id: SHARED_STORE_ID,
+        whatsapp_number: (data.catalogSettings && data.catalogSettings.whatsappNumber) || '',
+        store_name: (data.catalogSettings && data.catalogSettings.storeName) || 'Minha Loja',
+        logo_url: (data.catalogSettings && data.catalogSettings.logoUrl) || '',
+        tagline: (data.catalogSettings && data.catalogSettings.tagline) || '',
+        welcome_message: (data.catalogSettings && data.catalogSettings.welcomeMessage) || '',
+        products: snapshot,
+        updated_at: new Date().toISOString(),
+      });
+      if (error) throw error;
+      setPublishState('published');
+    } catch (e) {
+      console.error('Erro ao publicar cat\u00e1logo:', e);
+      setPublishState('error');
+    }
+  };
+
+  // ---- derived (moved above the loading-state early return, see top of App) ----
+
+  return (
+    <div className="min-h-screen fw-body flex" style={{ backgroundColor: '#F7F8FB' }}>
+      <Fonts />
+      {/* Sidebar */}
+      <aside className="w-56 shrink-0 flex flex-col" style={{ backgroundColor: '#0F172A' }}>
+        <div className="px-4 py-5 flex items-center gap-2">
+          {data.catalogSettings && data.catalogSettings.logoUrl ? (
+            <img src={data.catalogSettings.logoUrl} alt={data.catalogSettings.storeName || 'Logo'} className="h-7 w-auto" />
+          ) : (
+            <BrandMark variant="dark" height="h-6" fontSize={17} />
+          )}
+        </div>
+        <nav className="flex-1 py-2 px-2.5 flex flex-col gap-0.5">
+          {NAV.map(item => {
+            const Icon = item.icon;
+            const active = tab === item.key;
+            return (
+              <button
+                key={item.key}
+                onClick={() => setTab(item.key)}
+                className="w-full flex items-center gap-2.5 px-2.5 py-2 text-[13px] rounded-lg transition-colors"
+                style={active
+                  ? { backgroundColor: '#6C5BFF', color: '#ffffff', fontWeight: 500 }
+                  : { color: '#94A3B8' }}
+              >
+                <Icon size={15} />
+                {item.label}
+                {item.key === 'stock' && lowStock.length > 0 && !active && (
+                  <span className="ml-auto fw-mono text-[10px] px-1.5 rounded-full font-semibold" style={{ backgroundColor: '#EF4444', color: '#fff' }}>{lowStock.length}</span>
+                )}
+                {item.key === 'orders' && pendingOrders > 0 && !active && (
+                  <span className="ml-auto fw-mono text-[10px] px-1.5 rounded-full font-semibold" style={{ backgroundColor: '#EF4444', color: '#fff' }}>{pendingOrders}</span>
+                )}
+              </button>
+            );
+          })}
+        </nav>
+        <div className="px-3 py-3" style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+          <div className="fw-mono text-[10px] mb-2" style={{ color: '#475569' }}>
+            {saveState === 'saving' ? 'salvando...' : saveState === 'error' ? 'erro ao salvar' : 'dados salvos'}
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="rounded-full flex items-center justify-center shrink-0" style={{ width: '26px', height: '26px', backgroundColor: '#6C5BFF', color: '#fff', fontSize: '11px', fontWeight: 600 }}>
+              {(session.user.email || '?')[0].toUpperCase()}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-[11px] text-white truncate" title={session.user.email}>{session.user.email}</div>
+              <button onClick={onSignOut} className="text-[10.5px] hover:text-slate-900" style={{ color: '#64748B' }}>Sair</button>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      {/* Main */}
+      <main className="flex-1 p-8 max-w-6xl">
+        {tab === 'dashboard' && (
+          <DashboardTab
+            revenueThisMonth={revenueThisMonth} profitThisMonth={profitThisMonth}
+            pendingOrders={pendingOrders} lowStock={lowStock}
+            revenueByMonth={revenueByMonth} salesByType={salesByType}
+            revenueChangePct={revenueChangePct} profitChangePct={profitChangePct}
+            salesByCategory={salesByCategory} recentSales={recentSales}
+            totalProducts={data.products.length}
+          />
+        )}
+        {tab === 'products' && (
+          <ProductsTab sb={sb} products={data.products} onAdd={addProduct} onUpdate={updateProduct} onDelete={deleteProduct} />
+        )}
+        {tab === 'clients' && (
+          <ClientsTab clients={data.clients} onAdd={addClient} onDelete={deleteClient} />
+        )}
+        {tab === 'stock' && (
+          <StockTab products={data.products} onSetStock={setVariantStock} onUpdateProduct={updateProduct} />
+        )}
+        {tab === 'sales' && (
+          <SalesTab products={data.products} clients={data.clients} sales={data.sales} onRegister={registerSale} onDelete={deleteSale} />
+        )}
+        {tab === 'purchases' && (
+          <PurchasesTab products={data.products} purchases={data.purchases} onRegister={registerPurchase} onDelete={deletePurchase} />
+        )}
+        {tab === 'pricing' && (
+          <PricingTab
+            products={data.products}
+            costs={data.pricingCosts}
+            margin={data.pricingMargin}
+            onAddCost={addPricingCost}
+            onDeleteCost={deletePricingCost}
+            onSetMargin={setPricingMargin}
+            onApplyPrice={applyPrice}
+          />
+        )}
+        {tab === 'finance' && (
+          <FinanceTab finance={data.finance} onAdd={addFinance} onDelete={deleteFinance} cashFlow={cashFlow} />
+        )}
+        {tab === 'expenses' && (
+          <ExpensesTab finance={data.finance} sales={data.sales} onAdd={addFinance} onDelete={deleteFinance} />
+        )}
+        {tab === 'orders' && (
+          <OrdersTab products={data.products} clients={data.clients} orders={data.orders} onAdd={addOrder} onUpdateStatus={updateOrderStatus} onDelete={deleteOrder} />
+        )}
+        {tab === 'catalog' && (
+          <CatalogTab
+            sb={sb}
+            products={data.products}
+            settings={data.catalogSettings}
+            onSaveSettings={updateCatalogSettings}
+            onPublish={publishCatalog}
+            publishState={publishState}
+          />
+        )}
+        {tab === 'coupons' && (
+          <CouponsTab sb={sb} />
+        )}
+        {tab === 'reports' && (
+          <ReportsTab sales={data.sales} purchases={data.purchases} finance={data.finance} products={data.products} />
+        )}
+      </main>
+    </div>
+  );
+}
+
+// ---------- Dashboard ----------
+const DONUT_COLORS = ['#6C5BFF', '#9B8FFF', '#C4BCFF', '#E5E1FF'];
+
+function ChangeBadge({ pct }) {
+  if (pct === null || pct === undefined) return null;
+  const up = pct >= 0;
+  return (
+    <span className="text-[11px] font-medium" style={{ color: up ? '#16A34A' : '#DC2626' }}>
+      {up ? '↑' : '↓'} {Math.abs(pct)}%
+    </span>
+  );
+}
+
+function DashboardTab({ revenueThisMonth, profitThisMonth, pendingOrders, lowStock, revenueByMonth, salesByType, revenueChangePct, profitChangePct, salesByCategory, recentSales, totalProducts }) {
+  return (
+    <div>
+      <div className="mb-6">
+        <h1 className="fw-display text-[19px] font-semibold text-slate-900">Dashboard</h1>
+        <p className="text-[12.5px] text-slate-500 mt-0.5">Visão geral do seu negócio</p>
+      </div>
+
+      <div className="grid grid-cols-4 gap-3 mb-5">
+        <div className="bg-white rounded-[10px] border border-slate-200 px-4 py-3.5">
+          <p className="text-[11.5px] text-slate-500 mb-1.5">Vendas (mês)</p>
+          <p className="fw-mono text-[19px] font-semibold text-slate-900 mb-1">{formatBRL(revenueThisMonth)}</p>
+          <ChangeBadge pct={revenueChangePct} />
+        </div>
+        <div className="bg-white rounded-[10px] border border-slate-200 px-4 py-3.5">
+          <p className="text-[11.5px] text-slate-500 mb-1.5">Lucro do mês</p>
+          <p className="fw-mono text-[19px] font-semibold mb-1" style={{ color: '#6C5BFF' }}>{formatBRL(profitThisMonth)}</p>
+          <ChangeBadge pct={profitChangePct} />
+        </div>
+        <div className="bg-white rounded-[10px] border border-slate-200 px-4 py-3.5">
+          <p className="text-[11.5px] text-slate-500 mb-1.5">Pedidos pendentes</p>
+          <p className={`fw-mono text-[19px] font-semibold ${pendingOrders > 0 ? 'text-red-600' : 'text-slate-900'}`}>{pendingOrders}</p>
+        </div>
+        <div className="bg-white rounded-[10px] border border-slate-200 px-4 py-3.5">
+          <p className="text-[11.5px] text-slate-500 mb-1.5">Produtos cadastrados</p>
+          <p className="fw-mono text-[19px] font-semibold text-slate-900">{totalProducts}</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-[1.4fr_1fr] gap-4 mb-5">
+        <div className="bg-white rounded-[10px] border border-slate-200 p-4">
+          <p className="text-[13px] font-medium text-slate-800 mb-3">Receita — últimos meses</p>
+          <div style={{ height: '190px' }}>
+            {revenueByMonth.length === 0 ? <EmptyState text="Nenhuma venda registrada ainda." /> : (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={revenueByMonth}>
+                  <defs>
+                    <linearGradient id="revFill" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#6C5BFF" stopOpacity={0.18} />
+                      <stop offset="100%" stopColor="#6C5BFF" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#F1F2F7" vertical={false} />
+                  <XAxis dataKey="month" stroke="#94A3B8" fontSize={11} tickLine={false} axisLine={false} />
+                  <YAxis stroke="#94A3B8" fontSize={11} tickLine={false} axisLine={false} />
+                  <Tooltip contentStyle={{ background: '#fff', border: '1px solid #E2E5EC', borderRadius: 8, fontSize: 12 }} formatter={(v) => formatBRL(v)} />
+                  <Area type="monotone" dataKey="receita" stroke="#6C5BFF" strokeWidth={2.5} fill="url(#revFill)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        </div>
+        <div className="bg-white rounded-[10px] border border-slate-200 p-4">
+          <p className="text-[13px] font-medium text-slate-800 mb-3">Categorias mais vendidas</p>
+          {salesByCategory.length === 0 ? <EmptyState text="Sem vendas ainda." /> : (
+            <div className="flex items-center gap-4">
+              <div style={{ width: '96px', height: '96px' }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={salesByCategory} dataKey="value" nameKey="name" innerRadius={30} outerRadius={46} strokeWidth={0}>
+                      {salesByCategory.map((entry, i) => <Cell key={i} fill={DONUT_COLORS[i % DONUT_COLORS.length]} />)}
+                    </Pie>
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="text-[11.5px] text-slate-600 flex flex-col gap-1.5">
+                {salesByCategory.map((c, i) => (
+                  <div key={c.name} className="flex items-center gap-1.5">
+                    <span style={{ width: '8px', height: '8px', borderRadius: '999px', backgroundColor: DONUT_COLORS[i % DONUT_COLORS.length], display: 'inline-block' }}></span>
+                    {c.name} — {c.pct}%
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-[1.4fr_1fr] gap-4 mb-5">
+        <div className="bg-white rounded-[10px] border border-slate-200 p-4">
+          <p className="text-[13px] font-medium text-slate-800 mb-3">Vendas recentes</p>
+          {recentSales.length === 0 ? <EmptyState text="Nenhuma venda registrada ainda." /> : (
+            <table className="w-full fw-table">
+              <thead><tr><th>Cliente</th><th>Data</th><th>Total</th><th>Tipo</th></tr></thead>
+              <tbody>
+                {recentSales.map(s => (
+                  <tr key={s.id}>
+                    <td>{s.clientName}</td>
+                    <td>{s.date}</td>
+                    <td>{formatBRL(s.total)}</td>
+                    <td>
+                      <span
+                        className="text-[10.5px] px-2 py-0.5 rounded-full"
+                        style={s.type === 'atacado' ? { backgroundColor: '#EDE9FE', color: '#5B21B6' } : { backgroundColor: '#DCFCE7', color: '#166534' }}
+                      >{s.type === 'atacado' ? 'Atacado' : 'Varejo'}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+        <div className="bg-white rounded-[10px] border border-slate-200 p-4">
+          <p className="text-[13px] font-medium text-slate-800 mb-3">Estoque baixo</p>
+          {lowStock.length === 0 ? (
+            <div className="text-[12px] text-slate-500">Nenhum item abaixo do estoque mínimo.</div>
+          ) : (
+            <div className="flex flex-col gap-2.5">
+              {lowStock.slice(0, 5).map((item, i) => (
+                <div key={i} className="flex items-center justify-between">
+                  <div className="text-[12px] text-slate-700">
+                    {item.product} <span className="text-slate-400">({variantLabel(item.color, item.size)})</span>
+                  </div>
+                  <span
+                    className="rounded-full flex items-center justify-center shrink-0"
+                    style={{ width: '20px', height: '20px', backgroundColor: '#FEE2E2', color: '#991B1B', fontSize: '10.5px', fontWeight: 600 }}
+                  >{item.stock}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="rounded-[10px] px-5 py-4 flex items-center justify-between" style={{ backgroundColor: '#EFECFF' }}>
+        <div>
+          <p className="text-[13px] font-semibold mb-0.5" style={{ color: '#1E1B4B' }}>Seu negócio, no controle.</p>
+          <p className="text-[11.5px]" style={{ color: '#4C4A6E' }}>Gerencie produtos, estoque e vendas de forma simples e integrada.</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EmptyState({ text }) {
+  return <div className="h-full flex items-center justify-center text-sm text-slate-400">{text}</div>;
+}
+
+// ---------- Products ----------
+function PhotoUploader({ sb, value, onChange }) {
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleFile = async (e) => {
+    const file = e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    setError('');
+    setUploading(true);
+    try {
+      const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+      const path = `${uid('photo')}.${ext}`;
+      const { error: upErr } = await sb.storage.from('product-photos').upload(path, file, { upsert: true, contentType: file.type });
+      if (upErr) throw upErr;
+      const { data } = sb.storage.from('product-photos').getPublicUrl(path);
+      onChange(data.publicUrl);
+    } catch (err) {
+      setError('Erro ao enviar: ' + (err.message || 'tente novamente'));
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center gap-2">
+        {value ? (
+          <img src={value} alt="" className="w-10 h-10 object-cover rounded border border-slate-200" />
+        ) : (
+          <div className="w-10 h-10 rounded border border-slate-200 flex items-center justify-center text-slate-600"><ImageIcon size={16} /></div>
+        )}
+        <input type="file" accept="image/*" onChange={handleFile} className="text-[11px] text-slate-500 max-w-[160px]" />
+        {uploading && <span className="text-[11px] text-slate-500">enviando...</span>}
+      </div>
+      <input className="fw-input" placeholder="ou cole o link de uma foto (https://...)" value={value || ''} onChange={e => onChange(e.target.value)} />
+      {error && <span className="text-[11px] text-red-600">{error}</span>}
+    </div>
+  );
+}
+
+function MultiPhotoUploader({ sb, photos, onChange }) {
+  const arr = photos || [];
+  const setAt = (i, url) => {
+    const next = [...arr];
+    if (url) next[i] = url; else next.splice(i, 1);
+    onChange(next.filter(Boolean));
+  };
+  return (
+    <div className="flex flex-col gap-2">
+      {arr.map((url, i) => (
+        <div key={i} className="flex items-center gap-2">
+          <div className="flex-1"><PhotoUploader sb={sb} value={url} onChange={u => setAt(i, u)} /></div>
+          <button type="button" onClick={() => setAt(i, '')} className="fw-btn-ghost"><X size={12} /></button>
+        </div>
+      ))}
+      {arr.length < 3 && (
+        <PhotoUploader sb={sb} value="" onChange={u => onChange([...arr, u].filter(Boolean))} />
+      )}
+      <div className="text-[11px] text-slate-400">{arr.length}/3 fotos</div>
+    </div>
+  );
+}
+
+const EMPTY_PRODUCT_FORM = { name: '', category: '', cost: '', retail: '', wholesale: '', minStock: 3, colors: '', sizes: '', photos: [], description: '', notes: '' };
+
+function ProductsTab({ sb, products, onAdd, onUpdate, onDelete }) {
+  const [form, setForm] = useState(EMPTY_PRODUCT_FORM);
+  const [editingId, setEditingId] = useState(null);
+
+  const startEdit = (p) => {
+    setEditingId(p.id);
+    setForm({
+      name: p.name, category: p.category, cost: p.cost, retail: p.retail, wholesale: p.wholesale,
+      minStock: p.minStock, colors: [...new Set(p.variants.map(v => v.color))].join(', '),
+      sizes: [...new Set(p.variants.map(v => v.size))].filter(s => s !== SINGLE_SIZE).join(', '),
+      photos: p.photos || [], description: p.description || '', notes: p.notes || '',
+    });
+  };
+  const cancelEdit = () => { setEditingId(null); setForm(EMPTY_PRODUCT_FORM); };
+
+
+  const submit = (e) => {
+    e.preventDefault();
+    if (!form.name.trim()) return;
+    const colors = form.colors.split(',').map(c => c.trim()).filter(Boolean);
+    if (colors.length === 0) colors.push('Sem aroma');
+    const sizes = [...new Set(String(form.sizes || '').split(',').map(s => s.trim()).filter(Boolean))];
+    if (sizes.length === 0) sizes.push(SINGLE_SIZE);
+
+    const patch = {
+      name: form.name, category: form.category || 'Geral',
+      cost: Number(form.cost) || 0, retail: Number(form.retail) || 0, wholesale: Number(form.wholesale) || 0,
+      minStock: Number(form.minStock) || 3, photos: form.photos || [],
+      description: form.description || '', notes: form.notes || '',
+    };
+
+    if (editingId) {
+      // Preserva o estoque já lançado para aromas/tamanhos que continuam existindo;
+      // só zera estoque para aromas/tamanhos novos adicionados na edição.
+      const current = products.find(p => p.id === editingId);
+      const existingVariants = (current && current.variants) || [];
+      const variants = colors.flatMap(color => sizes.map(size => {
+        const found = existingVariants.find(v => v.color === color && v.size === size);
+        return found || { color, size, stock: 0 };
+      }));
+      onUpdate(editingId, { ...patch, variants });
+      cancelEdit();
+    } else {
+      const variants = colors.flatMap(color => sizes.map(size => ({ color, size, stock: 0 })));
+      onAdd({ id: uid('prod'), ...patch, variants });
+      setForm(EMPTY_PRODUCT_FORM);
+    }
+  };
+
+  return (
+    <div>
+      <Section title={editingId ? `Editando: ${form.name || 'produto'}` : 'Cadastro de produtos'}>
+        {editingId && (
+          <div className="text-[12px] text-green-700 bg-green-50 border border-green-200 rounded-lg p-2 mb-3">
+            Editando um produto existente. O estoque já lançado para os aromas/tamanhos que continuarem aqui é preservado — só aromas/tamanhos novos começam com estoque zerado.
+          </div>
+        )}
+        <form onSubmit={submit} className="bg-white border border-slate-200 p-4 grid grid-cols-3 gap-3 mb-4">
+          <Field label="Nome do produto"><input className="fw-input" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Vela Lavanda Francesa" /></Field>
+          <Field label="Categoria"><input className="fw-input" value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} placeholder="Vela em pote, Vela massageadora, Home spray..." /></Field>
+          <Field label="Aromas (separados por vírgula)"><input className="fw-input" value={form.colors} onChange={e => setForm(f => ({ ...f, colors: e.target.value }))} placeholder="Lavanda, Baunilha, Capim-limão" /></Field>
+          <Field label="Preço de custo"><input type="number" step="0.01" className="fw-input" value={form.cost} onChange={e => setForm(f => ({ ...f, cost: e.target.value }))} /></Field>
+          <Field label="Preço varejo"><input type="number" step="0.01" className="fw-input" value={form.retail} onChange={e => setForm(f => ({ ...f, retail: e.target.value }))} /></Field>
+          <Field label="Preço atacado"><input type="number" step="0.01" className="fw-input" value={form.wholesale} onChange={e => setForm(f => ({ ...f, wholesale: e.target.value }))} /></Field>
+          <Field label="Estoque mínimo por variação"><input type="number" className="fw-input" value={form.minStock} onChange={e => setForm(f => ({ ...f, minStock: e.target.value }))} /></Field>
+          <Field label="Composição (opcional)"><input className="fw-input" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Ex: cera de soja, pavio de algodão, óleos essenciais" /></Field>
+          <Field label="Observações (opcional)"><input className="fw-input" value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="Ex: cerca de 40h de queima, aparar o pavio antes de acender" /></Field>
+          <div className="col-span-3">
+            <Field label="Tamanhos (opcional, separados por vírgula — deixe vazio se a vela tiver tamanho único)"><input className="fw-input" value={form.sizes} onChange={e => setForm(f => ({ ...f, sizes: e.target.value }))} placeholder="Ex: 100g, 200g, 400g" /></Field>
+          </div>
+          <div className="col-span-3"><Field label="Fotos do produto (até 3, opcional)"><MultiPhotoUploader sb={sb} photos={form.photos} onChange={photos => setForm(f => ({ ...f, photos }))} /></Field></div>
+          <div className="col-span-3 flex justify-end gap-3">
+            {editingId && <button type="button" onClick={cancelEdit} className="fw-btn-ghost">Cancelar edição</button>}
+            <button className="fw-btn" type="submit">
+              {editingId ? <Check size={14} /> : <Plus size={14} />}
+              {editingId ? 'Salvar alterações' : 'Adicionar produto'}
+            </button>
+          </div>
+        </form>
+      </Section>
+
+      <div className="bg-white border border-slate-200 overflow-x-auto">
+        <table className="w-full fw-table">
+          <thead><tr><th>Foto</th><th>Produto</th><th>Categoria</th><th>Custo</th><th>Varejo</th><th>Atacado</th><th>Variações</th><th></th></tr></thead>
+          <tbody>
+            {products.length === 0 && <tr><td colSpan={8} className="text-slate-400 text-center py-6">Nenhum produto cadastrado.</td></tr>}
+            {products.map(p => (
+              <tr key={p.id} className={editingId === p.id ? 'bg-white' : ''}>
+                <td>
+                  {p.photos && p.photos[0] ? (
+                    <div className="relative w-9 h-9">
+                      <img src={p.photos[0]} alt="" className="w-9 h-9 object-cover rounded border border-slate-200" />
+                      {p.photos.length > 1 && <span className="absolute -bottom-1 -right-1 bg-white text-black text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center">{p.photos.length}</span>}
+                    </div>
+                  ) : (
+                    <div className="w-9 h-9 rounded border border-slate-200 flex items-center justify-center text-slate-600"><ImageIcon size={14} /></div>
+                  )}
+                </td>
+                <td className="font-medium text-slate-900">{p.name}</td>
+                <td>{p.category}</td>
+                <td>{formatBRL(p.cost)}</td>
+                <td>{formatBRL(p.retail)}</td>
+                <td>{formatBRL(p.wholesale)}</td>
+                <td>{p.variants.length} ({[...new Set(p.variants.map(v => v.color))].join(', ')})</td>
+                <td className="flex gap-1">
+                  <button onClick={() => startEdit(p)} className="fw-btn-ghost"><Pencil size={13} /></button>
+                  <button onClick={() => onDelete(p.id)} className="fw-btn-ghost"><Trash2 size={13} /></button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ---------- Catalog (vitrine pública) ----------
+function CatalogTab({ sb, products, settings, onSaveSettings, onPublish, publishState }) {
+  const [waNumber, setWaNumber] = useState((settings && settings.whatsappNumber) || '');
+  const [storeName, setStoreName] = useState((settings && settings.storeName) || '');
+  const [logoUrl, setLogoUrl] = useState((settings && settings.logoUrl) || '');
+  const [tagline, setTagline] = useState((settings && settings.tagline) || '');
+  const [welcomeMessage, setWelcomeMessage] = useState((settings && settings.welcomeMessage) || 'Aproveite nosso catálogo com as últimas novidades.');
+  const [copied, setCopied] = useState(false);
+
+  const catalogUrl = (() => {
+    try {
+      const url = new URL(window.location.href);
+      const parts = url.pathname.split('/');
+      parts[parts.length - 1] = 'catalogo.html';
+      url.pathname = parts.join('/');
+      url.hash = ''; url.search = '';
+      return url.toString();
+    } catch (e) { return ''; }
+  })();
+
+  const save = () => onSaveSettings({ whatsappNumber: waNumber, storeName, logoUrl, tagline, welcomeMessage });
+
+  const copyLink = async () => {
+    try { await navigator.clipboard.writeText(catalogUrl); setCopied(true); setTimeout(() => setCopied(false), 2000); }
+    catch (e) { /* ignore */ }
+  };
+
+  const withPhoto = products.filter(p => p.photos && p.photos.length > 0).length;
+
+  return (
+    <div>
+      <Section title="Configurações do catálogo público">
+        <div className="bg-white border border-slate-200 p-4 grid grid-cols-2 gap-3 mb-4">
+          <Field label="Nome da loja (aparece no catálogo)"><input className="fw-input" value={storeName} onChange={e => setStoreName(e.target.value)} placeholder="Nome da sua loja" /></Field>
+          <Field label="WhatsApp que recebe os pedidos (DDI+DDD+número, só dígitos)"><input className="fw-input" placeholder="5571999999999" value={waNumber} onChange={e => setWaNumber(e.target.value.replace(/[^0-9]/g, ''))} /></Field>
+          <div className="col-span-2"><Field label="Logo da loja (opcional — se não enviar, o nome da loja aparece como texto)"><PhotoUploader sb={sb} value={logoUrl} onChange={setLogoUrl} /></Field></div>
+          <Field label="Frase de efeito (opcional — aparece numa faixa animada no catálogo)"><input className="fw-input" value={tagline} onChange={e => setTagline(e.target.value)} placeholder="Ex: Aromas que acolhem." /></Field>
+          <Field label="Mensagem de boas-vindas (aparece no primeiro acesso do cliente)">
+            <textarea className="fw-input" rows={2} value={welcomeMessage} onChange={e => setWelcomeMessage(e.target.value)} />
+          </Field>
+          <div className="col-span-2 flex justify-end"><button onClick={save} className="fw-btn"><Check size={14} />Salvar configurações</button></div>
+        </div>
+      </Section>
+
+      <Section title="Publicar catálogo">
+        <div className="bg-white border border-slate-200 p-4">
+          <div className="text-[13px] text-slate-600 mb-3">
+            {products.length} produto(s) cadastrado(s), {withPhoto} com foto. Publicar atualiza a vitrine pública com fotos, descrição, aromas/tamanhos disponíveis e preço de varejo de cada produto.
+          </div>
+          <button onClick={onPublish} disabled={!waNumber || publishState === 'publishing'} className="fw-btn mb-4">
+            <Check size={14} />{publishState === 'publishing' ? 'Publicando...' : 'Publicar catálogo agora'}
+          </button>
+          {!waNumber && <div className="text-[12px] text-red-700 bg-red-50 border border-red-200 rounded-lg p-2 mb-4">Preencha e salve o número de WhatsApp antes de publicar.</div>}
+          {publishState === 'published' && <div className="text-[12px] text-green-700 bg-green-50 border border-green-200 rounded-lg p-2 mb-4">Catálogo publicado com sucesso.</div>}
+          {publishState === 'error' && <div className="text-[12px] text-red-700 bg-red-50 border border-red-200 rounded-lg p-2 mb-4">Erro ao publicar. Confira se rodou o seiva-setup.sql no Supabase.</div>}
+
+          {catalogUrl && (
+            <div>
+              <div className="text-[11px] text-slate-500 mb-1">Link público do catálogo (envie esse link para os clientes):</div>
+              <div className="flex items-center gap-2">
+                <input readOnly className="fw-input flex-1" value={catalogUrl} onClick={e => e.target.select()} />
+                <button onClick={copyLink} className="fw-btn-ghost">{copied ? 'Copiado!' : 'Copiar link'}</button>
+              </div>
+            </div>
+          )}
+        </div>
+      </Section>
+    </div>
+  );
+}
+
+// ---------- Coupons ----------
+const EMPTY_COUPON_FORM = { code: '', discount_type: 'percent', discount_value: '', valid_until: '', max_uses: '' };
+
+function CouponsTab({ sb }) {
+  const [coupons, setCoupons] = useState(null);
+  const [form, setForm] = useState(EMPTY_COUPON_FORM);
+  const [editingId, setEditingId] = useState(null);
+  const [error, setError] = useState('');
+
+  const load = async () => {
+    try {
+      const { data, error } = await sb.from('coupons').select('*').eq('user_id', SHARED_STORE_ID).order('created_at', { ascending: false });
+      if (error) throw error;
+      setCoupons(data || []);
+    } catch (e) {
+      console.error('Erro ao carregar cupons:', e);
+      setCoupons([]);
+    }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const startEdit = (c) => {
+    setEditingId(c.id);
+    setForm({
+      code: c.code, discount_type: c.discount_type, discount_value: c.discount_value,
+      valid_until: c.valid_until || '', max_uses: c.max_uses ?? '',
+    });
+  };
+  const cancelEdit = () => { setEditingId(null); setForm(EMPTY_COUPON_FORM); };
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setError('');
+    if (!form.code.trim() || form.discount_value === '') return;
+    const payload = {
+      code: form.code.trim().toUpperCase(),
+      discount_type: form.discount_type,
+      discount_value: Number(form.discount_value),
+      valid_until: form.valid_until || null,
+      max_uses: form.max_uses === '' ? null : Number(form.max_uses),
+    };
+    try {
+      if (editingId) {
+        const { error } = await sb.from('coupons').update(payload).eq('id', editingId);
+        if (error) throw error;
+      } else {
+        const { error } = await sb.from('coupons').insert({ ...payload, user_id: SHARED_STORE_ID, active: true, current_uses: 0 });
+        if (error) throw error;
+      }
+      cancelEdit();
+      load();
+    } catch (e) {
+      setError('Erro ao salvar cupom: ' + (e.message || 'tente novamente'));
+    }
+  };
+
+  const toggleActive = async (c) => {
+    await sb.from('coupons').update({ active: !c.active }).eq('id', c.id);
+    load();
+  };
+
+  const remove = async (id) => {
+    await sb.from('coupons').delete().eq('id', id);
+    load();
+  };
+
+  if (coupons === null) {
+    return <div className="text-slate-400 text-sm">Carregando cupons...</div>;
+  }
+
+  return (
+    <div>
+      <Section title={editingId ? 'Editando cupom' : 'Cadastro de cupons'}>
+        <form onSubmit={submit} className="bg-white border border-slate-200 p-4 grid grid-cols-3 gap-3 mb-4">
+          <Field label="Código do cupom"><input className="fw-input" style={{ textTransform: 'uppercase' }} value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value.toUpperCase().replace(/\s+/g, '') }))} placeholder="SEIVA10" /></Field>
+          <Field label="Tipo de desconto">
+            <select className="fw-input" value={form.discount_type} onChange={e => setForm(f => ({ ...f, discount_type: e.target.value }))}>
+              <option value="percent">Percentual (%)</option>
+              <option value="fixed">Valor fixo (R$)</option>
+            </select>
+          </Field>
+          <Field label={form.discount_type === 'percent' ? 'Percentual de desconto' : 'Valor de desconto (R$)'}>
+            <input type="number" step="0.01" className="fw-input" value={form.discount_value} onChange={e => setForm(f => ({ ...f, discount_value: e.target.value }))} />
+          </Field>
+          <Field label="Validade (opcional)"><input type="date" className="fw-input" value={form.valid_until} onChange={e => setForm(f => ({ ...f, valid_until: e.target.value }))} /></Field>
+          <Field label="Quantidade máxima de usos (opcional)"><input type="number" min="1" className="fw-input" value={form.max_uses} onChange={e => setForm(f => ({ ...f, max_uses: e.target.value }))} placeholder="Deixe em branco para ilimitado" /></Field>
+          <div className="flex items-end gap-3">
+            {editingId && <button type="button" onClick={cancelEdit} className="fw-btn-ghost">Cancelar</button>}
+            <button className="fw-btn" type="submit">
+              {editingId ? <Check size={14} /> : <Plus size={14} />}
+              {editingId ? 'Salvar' : 'Adicionar cupom'}
+            </button>
+          </div>
+          {error && <div className="col-span-3 text-[12px] text-red-700 bg-red-50 border border-red-200 rounded-lg p-2">{error}</div>}
+        </form>
+      </Section>
+
+      <div className="bg-white border border-slate-200 overflow-x-auto">
+        <table className="w-full fw-table">
+          <thead><tr><th>Cupom</th><th>Cadastro</th><th>Validade</th><th>Desconto</th><th>Usos</th><th>Status</th><th></th></tr></thead>
+          <tbody>
+            {coupons.length === 0 && <tr><td colSpan={7} className="text-slate-400 text-center py-6">Nenhum cupom cadastrado.</td></tr>}
+            {coupons.map(c => (
+              <tr key={c.id}>
+                <td className="font-medium text-slate-900 fw-mono">{c.code}</td>
+                <td>{(c.created_at || '').slice(0, 10)}</td>
+                <td>{c.valid_until || 'sem validade'}</td>
+                <td>{c.discount_type === 'percent' ? `${c.discount_value}%` : formatBRL(c.discount_value)}</td>
+                <td>{c.current_uses}{c.max_uses != null ? ` / ${c.max_uses}` : ' / ∞'}</td>
+                <td>
+                  <button onClick={() => toggleActive(c)} className="fw-btn-ghost">
+                    {c.active ? 'Ativo' : 'Inativo'}
+                  </button>
+                </td>
+                <td className="flex gap-1">
+                  <button onClick={() => startEdit(c)} className="fw-btn-ghost"><Pencil size={13} /></button>
+                  <button onClick={() => remove(c.id)} className="fw-btn-ghost"><Trash2 size={13} /></button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ---------- Clients ----------
+function ClientsTab({ clients, onAdd, onDelete }) {
+  const [form, setForm] = useState({ name: '', phone: '', type: 'varejo' });
+  const submit = (e) => {
+    e.preventDefault();
+    if (!form.name.trim()) return;
+    onAdd({ id: uid('client'), ...form, createdAt: todayISO() });
+    setForm({ name: '', phone: '', type: 'varejo' });
+  };
+  return (
+    <div>
+      <Section title="Cadastro de clientes">
+        <form onSubmit={submit} className="bg-white border border-slate-200 p-4 grid grid-cols-4 gap-3 mb-4">
+          <Field label="Nome"><input className="fw-input" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} /></Field>
+          <Field label="Telefone"><input className="fw-input" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} /></Field>
+          <Field label="Tipo">
+            <select className="fw-input" value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))}>
+              <option value="varejo">Varejo</option><option value="atacado">Atacado</option>
+            </select>
+          </Field>
+          <div className="flex items-end"><button className="fw-btn" type="submit"><Plus size={14} />Adicionar cliente</button></div>
+        </form>
+      </Section>
+      <div className="bg-white border border-slate-200 overflow-x-auto">
+        <table className="w-full fw-table">
+          <thead><tr><th>Nome</th><th>Telefone</th><th>Tipo</th><th>Desde</th><th></th></tr></thead>
+          <tbody>
+            {clients.length === 0 && <tr><td colSpan={5} className="text-slate-400 text-center py-6">Nenhum cliente cadastrado.</td></tr>}
+            {clients.map(c => (
+              <tr key={c.id}>
+                <td className="font-medium text-slate-900">{c.name}</td>
+                <td>{c.phone}</td>
+                <td className="capitalize">{c.type}</td>
+                <td>{c.createdAt}</td>
+                <td><button onClick={() => onDelete(c.id)} className="fw-btn-ghost"><Trash2 size={13} /></button></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ---------- Stock ----------
+function StockTab({ products, onSetStock, onUpdateProduct }) {
+  return (
+    <div>
+      <Section title="Controle de estoque por aroma e tamanho">
+        {products.length === 0 && <div className="text-slate-400 text-sm">Cadastre produtos primeiro na aba Produtos.</div>}
+        {products.map(p => {
+          const colors = [...new Set(p.variants.map(v => v.color))];
+          const sizes = [...new Set(p.variants.map(v => v.size))];
+          return (
+            <div key={p.id} className="bg-white border border-slate-200 p-4 mb-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="font-semibold text-slate-900">{p.name}</div>
+                <label className="flex items-center gap-2 text-xs text-slate-500">
+                  Estoque mínimo:
+                  <input type="number" className="fw-input w-16" value={p.minStock ?? 3} onChange={e => onUpdateProduct(p.id, { minStock: Number(e.target.value) })} />
+                </label>
+              </div>
+              <table className="w-full fw-table">
+                <thead><tr><th>Aroma</th>{sizes.map(s => <th key={s} className="text-center">{s}</th>)}</tr></thead>
+                <tbody>
+                  {colors.map(color => (
+                    <tr key={color}>
+                      <td className="font-medium">{color}</td>
+                      {sizes.map(size => {
+                        const v = p.variants.find(v => v.color === color && v.size === size);
+                        const low = v && v.stock <= (p.minStock ?? 3);
+                        return (
+                          <td key={size} className="text-center">
+                            <input
+                              type="number" min="0"
+                              className="fw-input w-16 text-center"
+                              style={low ? { borderColor: '#ffffff', color: '#ffffff', fontWeight: 700, boxShadow: '0 0 0 1px #ffffff' } : {}}
+                              value={v ? v.stock : 0}
+                              onChange={e => onSetStock(p.id, color, size, e.target.value)}
+                            />
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          );
+        })}
+      </Section>
+    </div>
+  );
+}
+
+// ---------- Sales ----------
+function SalesTab({ products, clients, sales, onRegister, onDelete }) {
+  const [clientId, setClientId] = useState('');
+  const [type, setType] = useState('varejo');
+  const [date, setDate] = useState(todayISO());
+  const [cart, setCart] = useState([]);
+  const [pick, setPick] = useState({ productId: '', color: '', size: '', qty: 1 });
+
+  const selectedProduct = products.find(p => p.id === pick.productId);
+  const colorsAvail = selectedProduct ? [...new Set(selectedProduct.variants.map(v => v.color))] : [];
+  const sizesAvail = selectedProduct && pick.color ? [...new Set(selectedProduct.variants.filter(v => v.color === pick.color).map(v => v.size))] : [];
+  const variantAvail = selectedProduct && pick.color ? selectedProduct.variants.find(v => v.color === pick.color && v.size === pick.size) : null;
+
+  const addToCart = () => {
+    if (!selectedProduct || !pick.color || !pick.size || !pick.qty) return;
+    const price = type === 'atacado' ? selectedProduct.wholesale : selectedProduct.retail;
+    setCart(c => [...c, { productId: pick.productId, productName: selectedProduct.name, color: pick.color, size: pick.size, qty: Number(pick.qty), price }]);
+    setPick({ productId: '', color: '', size: '', qty: 1 });
+  };
+  const removeFromCart = (i) => setCart(c => c.filter((_, idx) => idx !== i));
+  const total = cart.reduce((s, i) => s + i.price * i.qty, 0);
+
+  const submitSale = () => {
+    if (cart.length === 0) return;
+    const client = clients.find(c => c.id === clientId);
+    onRegister({ date, clientId: clientId || null, clientName: client ? client.name : 'Consumidor final', type, items: cart });
+    setCart([]);
+  };
+
+  return (
+    <div>
+      <Section title="Registrar venda">
+        <div className="bg-white border border-slate-200 p-4 mb-4">
+          <div className="grid grid-cols-4 gap-3 mb-4">
+            <Field label="Data"><input type="date" className="fw-input" value={date} onChange={e => setDate(e.target.value)} /></Field>
+            <Field label="Cliente">
+              <select className="fw-input" value={clientId} onChange={e => setClientId(e.target.value)}>
+                <option value="">Consumidor final</option>
+                {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </Field>
+            <Field label="Tipo de venda">
+              <select className="fw-input" value={type} onChange={e => setType(e.target.value)}>
+                <option value="varejo">Varejo</option><option value="atacado">Atacado</option>
+              </select>
+            </Field>
+          </div>
+
+          <div className="grid grid-cols-5 gap-3 items-end mb-3 border-t border-slate-200 pt-3">
+            <Field label="Produto">
+              <select className="fw-input" value={pick.productId} onChange={e => setPick({ productId: e.target.value, color: '', size: '', qty: 1 })}>
+                <option value="">Selecione</option>
+                {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </Field>
+            <Field label="Aroma">
+              <select className="fw-input" value={pick.color} onChange={e => { const color = e.target.value; const s = selectedProduct ? [...new Set(selectedProduct.variants.filter(v => v.color === color).map(v => v.size))] : []; setPick(p => ({ ...p, color, size: s.length === 1 ? s[0] : '' })); }} disabled={!selectedProduct}>
+                <option value="">Selecione</option>
+                {colorsAvail.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </Field>
+            <Field label="Tamanho">
+              <select className="fw-input" value={pick.size} onChange={e => setPick(p => ({ ...p, size: e.target.value }))} disabled={!pick.color}>
+                <option value="">Selecione</option>
+                {sizesAvail.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </Field>
+            <Field label={`Qtd ${variantAvail ? `(disp: ${variantAvail.stock})` : ''}`}>
+              <input type="number" min="1" className="fw-input" value={pick.qty} onChange={e => setPick(p => ({ ...p, qty: e.target.value }))} />
+            </Field>
+            <button onClick={addToCart} className="fw-btn justify-center"><Plus size={14} />Adicionar item</button>
+          </div>
+
+          {cart.length > 0 && (
+            <div className="border-t border-slate-200 pt-3">
+              <table className="w-full fw-table">
+                <thead><tr><th>Produto</th><th>Aroma</th><th>Tam.</th><th>Qtd</th><th>Preço unit.</th><th>Subtotal</th><th></th></tr></thead>
+                <tbody>
+                  {cart.map((i, idx) => (
+                    <tr key={idx}>
+                      <td>{i.productName}</td><td>{i.color}</td><td>{i.size}</td><td>{i.qty}</td>
+                      <td>{formatBRL(i.price)}</td><td>{formatBRL(i.price * i.qty)}</td>
+                      <td><button onClick={() => removeFromCart(idx)} className="fw-btn-ghost"><X size={12} /></button></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div className="flex items-center justify-between mt-3">
+                <div className="fw-mono text-slate-900 font-semibold text-lg">Total: {formatBRL(total)}</div>
+                <button onClick={submitSale} className="fw-btn"><Check size={14} />Finalizar venda</button>
+              </div>
+            </div>
+          )}
+        </div>
+      </Section>
+
+      <Section title="Histórico de vendas">
+        <div className="bg-white border border-slate-200 overflow-x-auto">
+          <table className="w-full fw-table">
+            <thead><tr><th>Data</th><th>Cliente</th><th>Tipo</th><th>Total</th><th>Lucro</th><th></th></tr></thead>
+            <tbody>
+              {sales.length === 0 && <tr><td colSpan={6} className="text-slate-400 text-center py-6">Nenhuma venda registrada.</td></tr>}
+              {[...sales].reverse().map(s => (
+                <tr key={s.id}>
+                  <td>{s.date}</td><td>{s.clientName}</td><td className="capitalize">{s.type}</td>
+                  <td>{formatBRL(s.total)}</td>
+                  <td className={s.profit >= 0 ? 'text-green-600' : 'text-red-600'}>{formatBRL(s.profit)}</td>
+                  <td><button onClick={() => onDelete(s.id)} className="fw-btn-ghost"><Trash2 size={13} /></button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Section>
+    </div>
+  );
+}
+
+// ---------- Purchases ----------
+function PurchasesTab({ products, purchases, onRegister, onDelete }) {
+  const [supplier, setSupplier] = useState('');
+  const [date, setDate] = useState(todayISO());
+  const [cart, setCart] = useState([]);
+  const [pick, setPick] = useState({ productId: '', color: '', size: '', qty: 1, cost: '' });
+
+  const selectedProduct = products.find(p => p.id === pick.productId);
+  const colorsAvail = selectedProduct ? [...new Set(selectedProduct.variants.map(v => v.color))] : [];
+  const sizesAvail = selectedProduct && pick.color ? [...new Set(selectedProduct.variants.filter(v => v.color === pick.color).map(v => v.size))] : [];
+
+  const addToCart = () => {
+    if (!selectedProduct || !pick.color || !pick.size || !pick.qty) return;
+    const cost = pick.cost !== '' ? Number(pick.cost) : selectedProduct.cost;
+    setCart(c => [...c, { productId: pick.productId, productName: selectedProduct.name, color: pick.color, size: pick.size, qty: Number(pick.qty), cost }]);
+    setPick({ productId: '', color: '', size: '', qty: 1, cost: '' });
+  };
+  const removeFromCart = (i) => setCart(c => c.filter((_, idx) => idx !== i));
+  const total = cart.reduce((s, i) => s + i.cost * i.qty, 0);
+
+  const submit = () => {
+    if (cart.length === 0 || !supplier.trim()) return;
+    onRegister({ date, supplier, items: cart });
+    setCart([]); setSupplier('');
+  };
+
+  return (
+    <div>
+      <Section title="Registrar compra de fornecedor">
+        <div className="bg-white border border-slate-200 p-4 mb-4">
+          <div className="grid grid-cols-3 gap-3 mb-4">
+            <Field label="Data"><input type="date" className="fw-input" value={date} onChange={e => setDate(e.target.value)} /></Field>
+            <Field label="Fornecedor"><input className="fw-input" value={supplier} onChange={e => setSupplier(e.target.value)} placeholder="Nome do fornecedor" /></Field>
+          </div>
+          <div className="grid grid-cols-5 gap-3 items-end mb-3 border-t border-slate-200 pt-3">
+            <Field label="Produto">
+              <select className="fw-input" value={pick.productId} onChange={e => setPick({ productId: e.target.value, color: '', size: '', qty: 1, cost: '' })}>
+                <option value="">Selecione</option>
+                {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </Field>
+            <Field label="Aroma">
+              <select className="fw-input" value={pick.color} onChange={e => { const color = e.target.value; const s = selectedProduct ? [...new Set(selectedProduct.variants.filter(v => v.color === color).map(v => v.size))] : []; setPick(p => ({ ...p, color, size: s.length === 1 ? s[0] : '' })); }} disabled={!selectedProduct}>
+                <option value="">Selecione</option>
+                {colorsAvail.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </Field>
+            <Field label="Tamanho">
+              <select className="fw-input" value={pick.size} onChange={e => setPick(p => ({ ...p, size: e.target.value }))} disabled={!pick.color}>
+                <option value="">Selecione</option>
+                {sizesAvail.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </Field>
+            <Field label="Qtd"><input type="number" min="1" className="fw-input" value={pick.qty} onChange={e => setPick(p => ({ ...p, qty: e.target.value }))} /></Field>
+            <button onClick={addToCart} className="fw-btn justify-center"><Plus size={14} />Adicionar item</button>
+          </div>
+          {cart.length > 0 && (
+            <div className="border-t border-slate-200 pt-3">
+              <table className="w-full fw-table">
+                <thead><tr><th>Produto</th><th>Aroma</th><th>Tam.</th><th>Qtd</th><th>Custo unit.</th><th>Subtotal</th><th></th></tr></thead>
+                <tbody>
+                  {cart.map((i, idx) => (
+                    <tr key={idx}>
+                      <td>{i.productName}</td><td>{i.color}</td><td>{i.size}</td><td>{i.qty}</td>
+                      <td>{formatBRL(i.cost)}</td><td>{formatBRL(i.cost * i.qty)}</td>
+                      <td><button onClick={() => removeFromCart(idx)} className="fw-btn-ghost"><X size={12} /></button></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div className="flex items-center justify-between mt-3">
+                <div className="fw-mono text-slate-900 font-bold text-lg">Total: {formatBRL(total)}</div>
+                <button onClick={submit} className="fw-btn"><Check size={14} />Registrar compra</button>
+              </div>
+            </div>
+          )}
+        </div>
+      </Section>
+
+      <Section title="Histórico de compras">
+        <div className="bg-white border border-slate-200 overflow-x-auto">
+          <table className="w-full fw-table">
+            <thead><tr><th>Data</th><th>Fornecedor</th><th>Itens</th><th>Total</th><th></th></tr></thead>
+            <tbody>
+              {purchases.length === 0 && <tr><td colSpan={5} className="text-slate-400 text-center py-6">Nenhuma compra registrada.</td></tr>}
+              {[...purchases].reverse().map(p => (
+                <tr key={p.id}>
+                  <td>{p.date}</td><td>{p.supplier}</td><td>{p.items.length}</td><td>{formatBRL(p.total)}</td>
+                  <td><button onClick={() => onDelete(p.id)} className="fw-btn-ghost"><Trash2 size={13} /></button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Section>
+    </div>
+  );
+}
+
+// ---------- Pricing calculator ----------
+function PricingTab({ products, costs, margin, onAddCost, onDeleteCost, onSetMargin, onApplyPrice }) {
+  const [productId, setProductId] = useState('');
+  const [manualCost, setManualCost] = useState('');
+  const [form, setForm] = useState({ name: '', type: 'fixo', value: '' });
+
+  const product = products.find(p => p.id === productId);
+  const baseCost = productId ? (manualCost !== '' ? Number(manualCost) : (product ? product.cost : 0)) : Number(manualCost) || 0;
+
+  const fixedItems = costs.filter(c => c.type === 'fixo');
+  const percentItems = costs.filter(c => c.type === 'percentual');
+  const marginNum = Number(margin) || 0;
+
+  const totalFixed = baseCost + fixedItems.reduce((s, c) => s + Number(c.value), 0);
+  const totalPercent = percentItems.reduce((s, c) => s + Number(c.value), 0) + marginNum;
+  const invalid = totalPercent >= 100;
+  const suggestedPrice = invalid ? null : totalFixed / (1 - totalPercent / 100);
+
+  const submitCost = (e) => {
+    e.preventDefault();
+    if (!form.name.trim() || form.value === '') return;
+    onAddCost({ name: form.name, type: form.type, value: Number(form.value) });
+    setForm({ name: '', type: 'fixo', value: '' });
+  };
+
+  return (
+    <div>
+      <Section title="Custos cadastrados">
+        <form onSubmit={submitCost} className="bg-white border border-slate-200 p-4 grid grid-cols-4 gap-3 mb-4">
+          <Field label="Nome do custo"><input className="fw-input" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Frete, embalagem, taxa cartão..." /></Field>
+          <Field label="Tipo">
+            <select className="fw-input" value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))}>
+              <option value="fixo">Valor fixo (R$)</option>
+              <option value="percentual">Percentual (%) do preço</option>
+            </select>
+          </Field>
+          <Field label={form.type === 'fixo' ? 'Valor (R$)' : 'Percentual (%)'}>
+            <input type="number" step="0.01" className="fw-input" value={form.value} onChange={e => setForm(f => ({ ...f, value: e.target.value }))} />
+          </Field>
+          <div className="flex items-end"><button className="fw-btn" type="submit"><Plus size={14} />Adicionar custo</button></div>
+        </form>
+        <div className="bg-white border border-slate-200 overflow-x-auto">
+          <table className="w-full fw-table">
+            <thead><tr><th>Custo</th><th>Tipo</th><th>Valor</th><th></th></tr></thead>
+            <tbody>
+              {costs.length === 0 && <tr><td colSpan={4} className="text-slate-400 text-center py-6">Nenhum custo cadastrado ainda.</td></tr>}
+              {costs.map(c => (
+                <tr key={c.id}>
+                  <td className="text-slate-900">{c.name}</td>
+                  <td>{c.type === 'fixo' ? 'Valor fixo' : 'Percentual do preço'}</td>
+                  <td>{c.type === 'fixo' ? formatBRL(c.value) : `${c.value}%`}</td>
+                  <td><button onClick={() => onDeleteCost(c.id)} className="fw-btn-ghost"><Trash2 size={13} /></button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Section>
+
+      <Section title="Calcular preço de venda">
+        <div className="bg-white border border-slate-200 p-4 mb-4">
+          <div className="grid grid-cols-3 gap-3 mb-4">
+            <Field label="Produto (opcional — preenche o custo automaticamente)">
+              <select className="fw-input" value={productId} onChange={e => { setProductId(e.target.value); setManualCost(''); }}>
+                <option value="">Nenhum — inserir custo manualmente</option>
+                {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </Field>
+            <Field label="Custo do produto (R$)">
+              <input type="number" step="0.01" className="fw-input"
+                value={manualCost !== '' ? manualCost : (product ? product.cost : '')}
+                onChange={e => setManualCost(e.target.value)} />
+            </Field>
+            <Field label="Margem de lucro desejada (%)">
+              <input type="number" step="0.01" className="fw-input" value={margin} onChange={e => onSetMargin(e.target.value === '' ? '' : Number(e.target.value))} />
+            </Field>
+          </div>
+
+          {invalid ? (
+            <div className="text-[13px] text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
+              ⚠ Os percentuais cadastrados (custos + margem) somam {totalPercent.toFixed(1)}%, que é igual ou maior que 100%.
+              Não existe preço possível nessas condições — reduza a margem ou os custos percentuais.
+            </div>
+          ) : (
+            <div>
+              <div className="flex flex-wrap gap-4 mb-4">
+                <StatCard label="Preço de venda sugerido" value={formatBRL(suggestedPrice)} />
+                <StatCard label="Custos totais (R$)" value={formatBRL(totalFixed + percentItems.reduce((s, c) => s + suggestedPrice * (Number(c.value) / 100), 0))} />
+                <StatCard label="Lucro líquido estimado" value={formatBRL(suggestedPrice * (marginNum / 100))} sub={`${marginNum}% do preço`} />
+              </div>
+
+              <div className="bg-white border border-slate-200 p-4 mb-4">
+                <div className="text-sm font-semibold text-slate-700 mb-3">Como esse preço se decompõe</div>
+                <table className="w-full fw-table">
+                  <thead><tr><th>Item</th><th>Tipo</th><th>Valor em R$ no preço final</th></tr></thead>
+                  <tbody>
+                    <tr><td>Custo do produto + custos fixos</td><td>Fixo</td><td>{formatBRL(totalFixed)}</td></tr>
+                    {percentItems.map(c => (
+                      <tr key={c.id}><td>{c.name}</td><td>{c.value}%</td><td>{formatBRL(suggestedPrice * (Number(c.value) / 100))}</td></tr>
+                    ))}
+                    <tr><td className="font-semibold text-slate-900">Margem de lucro</td><td>{marginNum}%</td><td className="font-semibold text-slate-900">{formatBRL(suggestedPrice * (marginNum / 100))}</td></tr>
+                  </tbody>
+                </table>
+              </div>
+
+              {product && (
+                <div className="flex gap-3">
+                  <button onClick={() => onApplyPrice(product.id, 'retail', suggestedPrice)} className="fw-btn"><Check size={14} />Aplicar como preço de varejo</button>
+                  <button onClick={() => onApplyPrice(product.id, 'wholesale', suggestedPrice)} className="fw-btn-ghost"><Check size={14} />Aplicar como preço de atacado</button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </Section>
+    </div>
+  );
+}
+
+// ---------- Finance ----------
+function FinanceTab({ finance, onAdd, onDelete, cashFlow }) {
+  const [form, setForm] = useState({ date: todayISO(), type: 'entrada', category: '', desc: '', value: '' });
+  const submit = (e) => {
+    e.preventDefault();
+    if (!form.value || !form.desc.trim()) return;
+    onAdd({ ...form, value: Number(form.value) });
+    setForm({ date: todayISO(), type: 'entrada', category: '', desc: '', value: '' });
+  };
+  const balance = finance.reduce((s, f) => s + (f.type === 'entrada' ? f.value : -f.value), 0);
+  const totalIn = finance.filter(f => f.type === 'entrada').reduce((s, f) => s + f.value, 0);
+  const totalOut = finance.filter(f => f.type === 'saida').reduce((s, f) => s + f.value, 0);
+
+  return (
+    <div>
+      <Section title="Entradas e saídas financeiras">
+        <div className="flex gap-4 mb-4">
+          <StatCard label="Total de entradas" value={formatBRL(totalIn)} />
+          <StatCard label="Total de saídas" value={formatBRL(totalOut)} />
+          <StatCard label="Saldo em caixa" value={formatBRL(balance)} alert={balance < 0} />
+        </div>
+        <form onSubmit={submit} className="bg-white border border-slate-200 p-4 grid grid-cols-5 gap-3 mb-4">
+          <Field label="Data"><input type="date" className="fw-input" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} /></Field>
+          <Field label="Tipo">
+            <select className="fw-input" value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))}>
+              <option value="entrada">Entrada</option><option value="saida">Saída</option>
+            </select>
+          </Field>
+          <Field label="Categoria"><input className="fw-input" value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} placeholder="Aluguel, marketing..." /></Field>
+          <Field label="Descrição"><input className="fw-input" value={form.desc} onChange={e => setForm(f => ({ ...f, desc: e.target.value }))} /></Field>
+          <Field label="Valor"><input type="number" step="0.01" className="fw-input" value={form.value} onChange={e => setForm(f => ({ ...f, value: e.target.value }))} /></Field>
+          <div className="col-span-5 flex justify-end"><button className="fw-btn" type="submit"><Plus size={14} />Lançar</button></div>
+        </form>
+      </Section>
+
+      <Section title="Fluxo de caixa">
+        <div className="bg-white border border-slate-200 p-4 h-56">
+          {cashFlow.length === 0 ? <EmptyState text="Sem lançamentos ainda." /> : (
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={cashFlow}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
+                <XAxis dataKey="date" stroke="#737373" fontSize={11} />
+                <YAxis stroke="#737373" fontSize={11} />
+                <Tooltip contentStyle={{ background: '#171717', border: '1px solid #404040', fontSize: 12 }} formatter={(v) => formatBRL(v)} />
+                <Line type="monotone" dataKey="saldo" stroke="#ffffff" strokeWidth={2} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+      </Section>
+
+      <Section title="Lançamentos">
+        <div className="bg-white border border-slate-200 overflow-x-auto">
+          <table className="w-full fw-table">
+            <thead><tr><th>Data</th><th>Tipo</th><th>Categoria</th><th>Descrição</th><th>Valor</th><th></th></tr></thead>
+            <tbody>
+              {finance.length === 0 && <tr><td colSpan={6} className="text-slate-400 text-center py-6">Nenhum lançamento.</td></tr>}
+              {[...finance].reverse().map(f => (
+                <tr key={f.id}>
+                  <td>{f.date}</td>
+                  <td className="flex items-center gap-1">{f.type === 'entrada' ? <TrendingUp size={13} className="text-green-600" /> : <TrendingDown size={13} className="text-red-600" />} {f.type}</td>
+                  <td>{f.category || '-'}</td>
+                  <td>{f.desc}{f.auto && <span className="text-slate-400 text-[10px] ml-1">(auto)</span>}</td>
+                  <td className={f.type === 'entrada' ? 'text-green-600' : 'text-red-600'}>{formatBRL(f.value)}</td>
+                  <td>{!f.auto && <button onClick={() => onDelete(f.id)} className="fw-btn-ghost"><Trash2 size={13} /></button>}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Section>
+    </div>
+  );
+}
+
+// ---------- Expenses (saídas) ----------
+const EXPENSE_CATEGORIES = ['Entrega/Frete', 'Embalagem', 'Marketing', 'Aluguel', 'Taxas e impostos', 'Salários', 'Outros'];
+
+function ExpensesTab({ finance, sales, onAdd, onDelete }) {
+  const months = useMemo(() => {
+    const set = new Set([...finance.map(f => monthKey(f.date)), ...sales.map(s => monthKey(s.date))]);
+    set.add(monthKey(todayISO()));
+    return [...set].sort().reverse();
+  }, [finance, sales]);
+  const [month, setMonth] = useState(monthKey(todayISO()));
+  const mk = months.includes(month) ? month : months[0];
+
+  const [form, setForm] = useState({ date: todayISO(), category: EXPENSE_CATEGORIES[0], desc: '', value: '' });
+
+  const submit = (e) => {
+    e.preventDefault();
+    if (!form.value || !form.desc.trim()) return;
+    onAdd({ date: form.date, type: 'saida', category: form.category, desc: form.desc, value: Number(form.value) });
+    setForm({ date: todayISO(), category: EXPENSE_CATEGORIES[0], desc: '', value: '' });
+  };
+
+  const monthExpenses = finance.filter(f => f.type === 'saida' && monthKey(f.date) === mk);
+  const monthSales = sales.filter(s => monthKey(s.date) === mk);
+  const revenue = monthSales.reduce((s, x) => s + x.total, 0);
+  const cogs = monthSales.reduce((s, x) => s + x.costTotal, 0);
+  const totalExpenses = monthExpenses.reduce((s, x) => s + x.value, 0);
+  const realProfit = revenue - cogs - totalExpenses;
+
+  const byCategory = useMemo(() => {
+    const map = {};
+    monthExpenses.forEach(f => { const cat = f.category || 'Outros'; map[cat] = (map[cat] || 0) + f.value; });
+    return Object.entries(map).sort(([, a], [, b]) => b - a);
+  }, [monthExpenses]);
+
+  return (
+    <div>
+      <Section title="Saídas — o que realmente sai do caixa" action={
+        <select className="fw-input" value={mk} onChange={e => setMonth(e.target.value)}>
+          {months.map(m => <option key={m} value={m}>{monthLabel(m)}</option>)}
+        </select>
+      }>
+        <div className="flex flex-wrap gap-4 mb-6">
+          <StatCard label="Faturamento bruto (vendas)" value={formatBRL(revenue)} />
+          <StatCard label="Custo dos produtos vendidos" value={formatBRL(cogs)} />
+          <StatCard label="Saídas registradas" value={formatBRL(totalExpenses)} alert={totalExpenses > 0} />
+          <StatCard label="Lucro real do mês" value={formatBRL(realProfit)} alert={realProfit < 0} />
+        </div>
+        <div className="text-[11px] text-slate-500 mb-6 fw-mono">
+          lucro real = faturamento bruto − custo dos produtos vendidos − saídas registradas (entrega, embalagem, despesas gerais etc.)
+        </div>
+
+        <form onSubmit={submit} className="bg-white border border-slate-200 p-4 grid grid-cols-5 gap-3 mb-6">
+          <Field label="Data"><input type="date" className="fw-input" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} /></Field>
+          <Field label="Categoria">
+            <select className="fw-input" value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}>
+              {EXPENSE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </Field>
+          <Field label="Descrição"><input className="fw-input" value={form.desc} onChange={e => setForm(f => ({ ...f, desc: e.target.value }))} placeholder="Ex: entrega pedido #123" /></Field>
+          <Field label="Valor"><input type="number" step="0.01" className="fw-input" value={form.value} onChange={e => setForm(f => ({ ...f, value: e.target.value }))} /></Field>
+          <div className="flex items-end"><button className="fw-btn" type="submit"><Plus size={14} />Registrar saída</button></div>
+        </form>
+
+        <div className="grid grid-cols-2 gap-6">
+          <div className="bg-white border border-slate-200 overflow-x-auto">
+            <table className="w-full fw-table">
+              <thead><tr><th>Data</th><th>Categoria</th><th>Descrição</th><th>Valor</th><th></th></tr></thead>
+              <tbody>
+                {monthExpenses.length === 0 && <tr><td colSpan={5} className="text-slate-400 text-center py-6">Nenhuma saída registrada neste mês.</td></tr>}
+                {[...monthExpenses].reverse().map(f => (
+                  <tr key={f.id}>
+                    <td>{f.date}</td>
+                    <td>{f.category || '-'}</td>
+                    <td>{f.desc}{f.auto && <span className="text-slate-400 text-[10px] ml-1">(auto)</span>}</td>
+                    <td className="text-slate-900">{formatBRL(f.value)}</td>
+                    <td>{!f.auto && <button onClick={() => onDelete(f.id)} className="fw-btn-ghost"><Trash2 size={13} /></button>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="bg-white border border-slate-200 p-4">
+            <div className="text-sm font-semibold text-slate-700 mb-3">Saídas por categoria neste mês</div>
+            {byCategory.length === 0 ? <div className="text-slate-400 text-sm">Sem dados ainda.</div> : (
+              <table className="w-full fw-table">
+                <thead><tr><th>Categoria</th><th>Total</th></tr></thead>
+                <tbody>{byCategory.map(([cat, val]) => <tr key={cat}><td>{cat}</td><td>{formatBRL(val)}</td></tr>)}</tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      </Section>
+    </div>
+  );
+}
+
+// ---------- Orders ----------
+const ORDER_STATUS = ['pendente', 'enviado', 'entregue'];
+function OrdersTab({ products, clients, orders, onAdd, onUpdateStatus, onDelete }) {
+  const [clientId, setClientId] = useState('');
+  const [date, setDate] = useState(todayISO());
+  const [notes, setNotes] = useState('');
+  const [cart, setCart] = useState([]);
+  const [pick, setPick] = useState({ productId: '', color: '', size: '', qty: 1 });
+
+  const selectedProduct = products.find(p => p.id === pick.productId);
+  const colorsAvail = selectedProduct ? [...new Set(selectedProduct.variants.map(v => v.color))] : [];
+  const sizesAvail = selectedProduct && pick.color ? [...new Set(selectedProduct.variants.filter(v => v.color === pick.color).map(v => v.size))] : [];
+
+  const addToCart = () => {
+    if (!selectedProduct || !pick.color || !pick.size || !pick.qty) return;
+    setCart(c => [...c, { productId: pick.productId, productName: selectedProduct.name, color: pick.color, size: pick.size, qty: Number(pick.qty) }]);
+    setPick({ productId: '', color: '', size: '', qty: 1 });
+  };
+
+  const submit = () => {
+    if (cart.length === 0) return;
+    const client = clients.find(c => c.id === clientId);
+    onAdd({ date, clientId: clientId || null, clientName: client ? client.name : 'Consumidor final', items: cart, status: 'pendente', notes });
+    setCart([]); setNotes('');
+  };
+
+  return (
+    <div>
+      <Section title="Novo pedido">
+        <div className="bg-white border border-slate-200 p-4 mb-4">
+          <div className="grid grid-cols-3 gap-3 mb-4">
+            <Field label="Data"><input type="date" className="fw-input" value={date} onChange={e => setDate(e.target.value)} /></Field>
+            <Field label="Cliente">
+              <select className="fw-input" value={clientId} onChange={e => setClientId(e.target.value)}>
+                <option value="">Consumidor final</option>
+                {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </Field>
+            <Field label="Observações"><input className="fw-input" value={notes} onChange={e => setNotes(e.target.value)} /></Field>
+          </div>
+          <div className="grid grid-cols-5 gap-3 items-end mb-3 border-t border-slate-200 pt-3">
+            <Field label="Produto">
+              <select className="fw-input" value={pick.productId} onChange={e => setPick({ productId: e.target.value, color: '', size: '', qty: 1 })}>
+                <option value="">Selecione</option>
+                {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </Field>
+            <Field label="Aroma">
+              <select className="fw-input" value={pick.color} onChange={e => { const color = e.target.value; const s = selectedProduct ? [...new Set(selectedProduct.variants.filter(v => v.color === color).map(v => v.size))] : []; setPick(p => ({ ...p, color, size: s.length === 1 ? s[0] : '' })); }} disabled={!selectedProduct}>
+                <option value="">Selecione</option>
+                {colorsAvail.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </Field>
+            <Field label="Tamanho">
+              <select className="fw-input" value={pick.size} onChange={e => setPick(p => ({ ...p, size: e.target.value }))} disabled={!pick.color}>
+                <option value="">Selecione</option>
+                {sizesAvail.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </Field>
+            <Field label="Qtd"><input type="number" min="1" className="fw-input" value={pick.qty} onChange={e => setPick(p => ({ ...p, qty: e.target.value }))} /></Field>
+            <button onClick={addToCart} className="fw-btn justify-center"><Plus size={14} />Adicionar item</button>
+          </div>
+          {cart.length > 0 && (
+            <div className="border-t border-slate-200 pt-3">
+              <table className="w-full fw-table">
+                <thead><tr><th>Produto</th><th>Aroma</th><th>Tam.</th><th>Qtd</th></tr></thead>
+                <tbody>{cart.map((i, idx) => <tr key={idx}><td>{i.productName}</td><td>{i.color}</td><td>{i.size}</td><td>{i.qty}</td></tr>)}</tbody>
+              </table>
+              <div className="flex justify-end mt-3"><button onClick={submit} className="fw-btn"><Check size={14} />Criar pedido</button></div>
+            </div>
+          )}
+        </div>
+      </Section>
+
+      <Section title="Pedidos">
+        <div className="bg-white border border-slate-200 overflow-x-auto">
+          <table className="w-full fw-table">
+            <thead><tr><th>Data</th><th>Cliente</th><th>Itens</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+              {orders.length === 0 && <tr><td colSpan={5} className="text-slate-400 text-center py-6">Nenhum pedido registrado.</td></tr>}
+              {[...orders].reverse().map(o => (
+                <tr key={o.id}>
+                  <td>{o.date}</td><td>{o.clientName}</td>
+                  <td>{o.items.map(i => `${i.productName} (${variantLabel(i.color, i.size)} x${i.qty})`).join(', ')}</td>
+                  <td>
+                    <select className="fw-input" value={o.status} onChange={e => onUpdateStatus(o.id, e.target.value)}
+                      style={{ color: '#ffffff', fontWeight: o.status === 'pendente' ? 700 : 400, fontStyle: o.status === 'enviado' ? 'italic' : 'normal', textDecoration: o.status === 'pendente' ? 'underline' : 'none' }}>
+                      {ORDER_STATUS.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </td>
+                  <td><button onClick={() => onDelete(o.id)} className="fw-btn-ghost"><Trash2 size={13} /></button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Section>
+    </div>
+  );
+}
+
+// ---------- Reports ----------
+function ReportsTab({ sales, purchases, finance, products }) {
+  const months = useMemo(() => {
+    const set = new Set([...sales.map(s => monthKey(s.date)), ...purchases.map(p => monthKey(p.date)), ...finance.map(f => monthKey(f.date))]);
+    return [...set].sort().reverse();
+  }, [sales, purchases, finance]);
+  const [selected, setSelected] = useState(months[0] || thisMk());
+  function thisMk() { return monthKey(todayISO()); }
+  const mk = months.includes(selected) ? selected : (months[0] || thisMk());
+
+  const monthSales = sales.filter(s => monthKey(s.date) === mk);
+  const monthPurchases = purchases.filter(p => monthKey(p.date) === mk);
+  const monthExpenses = finance.filter(f => monthKey(f.date) === mk && f.type === 'saida' && !f.auto);
+  const revenue = monthSales.reduce((s, x) => s + x.total, 0);
+  const cost = monthSales.reduce((s, x) => s + x.costTotal, 0);
+  const expenses = monthExpenses.reduce((s, x) => s + x.value, 0);
+  const purchaseTotal = monthPurchases.reduce((s, x) => s + x.total, 0);
+  const netProfit = revenue - cost - expenses;
+
+  const topProducts = useMemo(() => {
+    const map = {};
+    monthSales.forEach(s => s.items.forEach(i => { map[i.productName] = (map[i.productName] || 0) + i.qty; }));
+    return Object.entries(map).sort(([, a], [, b]) => b - a).slice(0, 5);
+  }, [monthSales]);
+
+  return (
+    <div>
+      <Section title="Relatório mensal" action={
+        <select className="fw-input" value={mk} onChange={e => setSelected(e.target.value)}>
+          {months.length === 0 && <option value={thisMk()}>{monthLabel(thisMk())}</option>}
+          {months.map(m => <option key={m} value={m}>{monthLabel(m)}</option>)}
+        </select>
+      }>
+        <div className="flex flex-wrap gap-4 mb-6">
+          <StatCard label="Receita de vendas" value={formatBRL(revenue)} />
+          <StatCard label="Custo dos produtos vendidos" value={formatBRL(cost)} tone="neutral" />
+          <StatCard label="Compras de fornecedores" value={formatBRL(purchaseTotal)} tone="neutral" />
+          <StatCard label="Despesas" value={formatBRL(expenses)} />
+          <StatCard label="Lucro líquido" value={formatBRL(netProfit)} alert={netProfit < 0} />
+        </div>
+
+        <div className="bg-white border border-slate-200 p-4">
+          <div className="text-sm font-semibold text-slate-700 mb-3">Produtos mais vendidos no mês</div>
+          {topProducts.length === 0 ? <div className="text-slate-400 text-sm">Sem vendas neste mês.</div> : (
+            <table className="w-full fw-table">
+              <thead><tr><th>Produto</th><th>Unidades vendidas</th></tr></thead>
+              <tbody>{topProducts.map(([name, qty]) => <tr key={name}><td>{name}</td><td>{qty}</td></tr>)}</tbody>
+            </table>
+          )}
+        </div>
+      </Section>
+    </div>
+  );
+}
+
+
+function ConfigNeeded() {
+  return (
+    <div className="min-h-screen flex items-center justify-center fw-body px-4" style={{ backgroundColor: '#0F172A' }}>
+      <Fonts />
+      <div className="w-full max-w-lg bg-white rounded-xl p-6">
+        <div className="mb-6"><BrandMark variant="light" height="h-6" fontSize={17} /></div>
+        <div className="font-semibold mb-2" style={{ color: '#0F172A' }}>⚠ Configuração do banco de dados pendente</div>
+        <div className="text-slate-600 text-[13px] leading-relaxed mb-4">
+          Este arquivo ainda está com os valores de exemplo no lugar da conexão com o Supabase.
+          Abra o arquivo num editor de texto, procure por estas duas linhas perto do topo do arquivo:
+        </div>
+        <pre className="fw-mono text-[12px] text-slate-700 bg-slate-50 border border-slate-200 rounded-lg p-3 mb-4 overflow-x-auto">{`const SUPABASE_URL = 'COLE_AQUI_SUA_SUPABASE_URL';
+const SUPABASE_ANON_KEY = 'COLE_AQUI_SUA_SUPABASE_ANON_KEY';`}</pre>
+        <div className="text-slate-600 text-[13px] leading-relaxed">
+          E substitua pelos valores do seu projeto, encontrados em <span style={{ color: '#6C5BFF', fontWeight: 500 }}>Project Settings → API</span> no painel do Supabase.
+          Depois é só salvar o arquivo e publicar de novo.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LoginScreen({ sb }) {
+  const [mode, setMode] = useState('login');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [info, setInfo] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setError(''); setInfo(''); setLoading(true);
+    try {
+      if (mode === 'login') {
+        const { error } = await sb.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+      } else {
+        const { error } = await sb.auth.signUp({ email, password });
+        if (error) throw error;
+        setInfo('Conta criada! Se a confirmação por e-mail estiver ativa no seu projeto, confira sua caixa de entrada antes de entrar.');
+      }
+    } catch (e) {
+      setError(e.message || 'Algo deu errado. Tente novamente.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center fw-body px-4" style={{ backgroundColor: '#0F172A' }}>
+      <Fonts />
+      <div className="w-full max-w-sm">
+        <div className="flex items-center justify-center mb-8"><BrandMark variant="dark" height="h-8" fontSize={24} /></div>
+        <form onSubmit={submit} className="bg-white rounded-xl p-6 flex flex-col gap-3">
+          <div className="flex mb-2 border border-slate-200 rounded-lg overflow-hidden">
+            <button type="button" onClick={() => setMode('login')}
+              className="flex-1 py-2 text-xs font-medium" style={mode === 'login' ? { backgroundColor: '#6C5BFF', color: '#fff' } : { color: '#64748B' }}>Entrar</button>
+            <button type="button" onClick={() => setMode('signup')}
+              className="flex-1 py-2 text-xs font-medium" style={mode === 'signup' ? { backgroundColor: '#6C5BFF', color: '#fff' } : { color: '#64748B' }}>Criar conta</button>
+          </div>
+          <Field label="E-mail">
+            <input type="email" required className="fw-input" value={email} onChange={e => setEmail(e.target.value)} placeholder="voce@email.com" />
+          </Field>
+          <Field label="Senha">
+            <input type="password" required minLength={6} className="fw-input" value={password} onChange={e => setPassword(e.target.value)} placeholder="mínimo 6 caracteres" />
+          </Field>
+          {error && <div className="text-[12px] rounded-lg p-2" style={{ color: '#991B1B', backgroundColor: '#FEE2E2' }}>{error}</div>}
+          {info && <div className="text-[12px] rounded-lg p-2" style={{ color: '#475569', backgroundColor: '#F1F5F9' }}>{info}</div>}
+          <button type="submit" disabled={loading} className="fw-btn justify-center mt-1">
+            {loading ? 'aguarde...' : mode === 'login' ? 'Entrar' : 'Criar conta'}
+          </button>
+        </form>
+        <div className="text-center text-[11px] mt-4 fw-mono" style={{ color: '#64748B' }}>
+          seus dados ficam privados, vinculados só a este login
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AuthGate({ sb }) {
+  const [session, setSession] = useState(undefined);
+
+  useEffect(() => {
+    sb.auth.getSession().then(({ data }) => setSession(data.session));
+    const { data: listener } = sb.auth.onAuthStateChange((_event, newSession) => {
+      setSession(newSession);
+    });
+    return () => listener.subscription.unsubscribe();
+  }, []);
+
+  if (session === undefined) {
+    return (
+      <div className="min-h-screen flex items-center justify-center fw-mono text-sm" style={{ backgroundColor: '#0F172A', color: '#94A3B8' }}>
+        verificando login...
+      </div>
+    );
+  }
+
+  if (!session) {
+    return <LoginScreen sb={sb} />;
+  }
+
+  return <App sb={sb} session={session} onSignOut={() => sb.auth.signOut()} />;
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(CONFIG_OK ? <AuthGate sb={sb} /> : <ConfigNeeded />);
+</script>
+</body>
+</html>

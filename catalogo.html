@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Catálogo</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/@babel/standalone@7.24.7/babel.min.js"></script>
+<style>
+  html, body { margin: 0; background: #ffffff; }
+  #root:empty::before {
+    content: 'Carregando catálogo...';
+    color: #666; font-family: monospace; font-size: 12px; display: block; padding: 24px;
+  }
+  ::view-transition-old(active-photo), ::view-transition-new(active-photo) {
+    animation-duration: 0.45s;
+    animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  ::view-transition-old(root), ::view-transition-new(root) {
+    animation-duration: 0.3s;
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+  window.addEventListener('error', function (e) {
+    var root = document.getElementById('root');
+    root.innerHTML = '<div style="color:#fff;background:#000;font-family:monospace;padding:24px;white-space:pre-wrap;">'
+      + '⚠ Erro ao carregar o catálogo:\n\n' + (e.message || e)
+      + '\n\nVerifique sua conexão com a internet e tente recarregar a página.'
+      + '</div>';
+  });
+</script>
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useMemo } = React;
+const { flushSync } = ReactDOM;
+
+const SUPABASE_URL = 'https://hvbvwoebawijnrwadomc.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_xg2s2s51cwMofaTEILj6QQ_XtDmPPWM';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const SHARED_STORE_ID = 'f9d8820d-b6bd-42fe-b12e-8fa73c1d01f2';
+
+function formatBRL(v) {
+  const n = Number(v) || 0;
+  return 'R$ ' + n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+const PAYMENT_METHODS = [
+  { value: 'pix', label: 'Pix' },
+  { value: 'cartao', label: 'Cartão (link de pagamento)' },
+];
+
+function Fonts() {
+  return (
+    <style>{`
+      @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap');
+
+      .f-display { font-family: 'Poppins', sans-serif; }
+      .f-body { font-family: 'Poppins', sans-serif; }
+      .f-mono { font-family: 'Poppins', sans-serif; font-variant-numeric: tabular-nums; }
+      .eyebrow { font-family: 'Poppins', sans-serif; text-transform: uppercase; letter-spacing: 0.14em; font-size: 11px; color: #6C5BFF; font-weight: 600; }
+
+      .fw-input {
+        background: #ffffff; border: 1px solid #E2E5EC; color: #0F172A;
+        padding: 10px 12px; font-size: 14px; outline: none; width: 100%; font-family: 'Poppins', sans-serif;
+        border-radius: 8px;
+      }
+      .fw-input:focus { border-color: #6C5BFF; box-shadow: 0 0 0 3px rgba(108,91,255,0.12); }
+      .fw-input option { color: #0F172A; background: #ffffff; }
+
+      .search-input {
+        background: #ffffff; border: 1px solid #E2E5EC; color: #0F172A;
+        padding: 10px 16px; font-size: 13px; outline: none; border-radius: 999px; font-family: 'Poppins', sans-serif;
+      }
+      .search-input::placeholder { color: #94A3B8; }
+      .search-input:focus { border-color: #6C5BFF; box-shadow: 0 0 0 3px rgba(108,91,255,0.12); }
+
+      .pill {
+        font-family: 'Poppins', sans-serif; font-size: 12px; font-weight: 500;
+        padding: 8px 16px; border-radius: 999px; border: 1px solid #E2E5EC; color: #64748B;
+        background: #ffffff; transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+        white-space: nowrap;
+      }
+      .pill.selected { background: #6C5BFF; color: #ffffff; border-color: #6C5BFF; font-weight: 600; }
+      .pill:hover:not(.selected) { border-color: #6C5BFF; color: #6C5BFF; }
+
+      .btn-primary {
+        background: #6C5BFF; color: #ffffff; font-weight: 600; font-size: 13px;
+        letter-spacing: 0.02em; padding: 14px 18px; border-radius: 10px; border: none;
+        display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+        transition: background 0.2s ease; font-family: 'Poppins', sans-serif;
+      }
+      .btn-primary:hover:not(:disabled) { background: #5A4AE0; }
+      .btn-primary:disabled { opacity: 0.4; }
+
+      .size-pill {
+        font-family: 'Poppins', sans-serif; font-size: 11.5px; font-weight: 500;
+        padding: 5px 12px; border-radius: 999px; border: 1px solid #E2E5EC; color: #64748B;
+        background: #ffffff; transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+      }
+      .size-pill.selected { background: #6C5BFF; color: #ffffff; border-color: #6C5BFF; }
+      .size-pill:hover:not(.selected) { border-color: #6C5BFF; color: #6C5BFF; }
+
+      .details-toggle {
+        font-family: 'Poppins', sans-serif; font-size: 12px; color: #6C5BFF;
+        text-decoration: underline; text-underline-offset: 2px;
+        background: none; border: none; padding: 0; cursor: pointer;
+        display: inline-block; transform-origin: left center;
+        transition: transform 0.25s ease, color 0.2s ease;
+      }
+      .details-toggle:hover { transform: scale(1.06); color: #5A4AE0; }
+
+      .fw-btn-ghost {
+        background: #ffffff; border: 1px solid #E2E5EC; color: #64748B;
+        padding: 9px 14px; border-radius: 8px; font-size: 13px; font-weight: 500;
+        font-family: 'Poppins', sans-serif; display: inline-flex; align-items: center; justify-content: center;
+        transition: border-color 0.15s ease, color 0.15s ease;
+      }
+      .fw-btn-ghost:hover:not(:disabled) { border-color: #6C5BFF; color: #6C5BFF; }
+      .fw-btn-ghost:disabled { opacity: 0.5; }
+
+      .lightbox-icon-btn {
+        width: 40px; height: 40px; border-radius: 999px; border: none;
+        background: rgba(255, 255, 255, 0.92); color: #0F172A;
+        display: flex; align-items: center; justify-content: center;
+        line-height: 1; transition: background 0.2s ease, transform 0.2s ease;
+      }
+      .lightbox-icon-btn:hover { background: #ffffff; transform: scale(1.08); }
+
+      @media (prefers-reduced-motion: no-preference) {
+        .look-card { animation: fadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) both; }
+        .look-photo img { transition: transform 1.1s cubic-bezier(0.16, 1, 0.3, 1); }
+        .look-card:hover .look-photo img { transform: scale(1.035); }
+        .cart-drawer { animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) both; }
+      }
+      @keyframes fadeUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+      @keyframes slideUp { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
+      @media (prefers-reduced-motion: no-preference) {
+        .welcome-card { animation: welcomeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) both; }
+      }
+      @keyframes welcomeIn { from { opacity: 0; transform: scale(0.96) translateY(8px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+
+      @media (prefers-reduced-motion: no-preference) {
+        .brand-fade { animation: brandFade 8s ease-in-out infinite; }
+        .slogan-fade { animation: sloganFade 8s ease-in-out infinite; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .brand-fade { opacity: 1; }
+        .slogan-fade { opacity: 0; display: none; }
+      }
+      @keyframes brandFade {
+        0% { opacity: 1; }
+        37.5% { opacity: 1; }
+        50% { opacity: 0; }
+        87.5% { opacity: 0; }
+        100% { opacity: 1; }
+      }
+      @keyframes sloganFade {
+        0% { opacity: 0; }
+        37.5% { opacity: 0; }
+        50% { opacity: 1; }
+        87.5% { opacity: 1; }
+        100% { opacity: 0; }
+      }
+    `}</style>
+  );
+}
+
+// MARCA — cole aqui o ícone da logo quando chegar (link https://... ou data:image/png;base64,...)
+const BRAND_NAME = 'Seiva Aromas';
+const BRAND_ICON = '';
+const SINGLE_SIZE = 'Único';
+function variantLabel(color, size) { return size && size !== SINGLE_SIZE ? `${color}/${size}` : color; }
+
+function WelcomeBanner({ storeName, logoUrl, welcomeMessage, onClose }) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center px-5"
+      style={{ backgroundColor: 'rgba(15,23,42,0.75)', backdropFilter: 'blur(3px)' }}
+      onClick={onClose}
+    >
+      <div
+        className="relative w-full max-w-sm welcome-card rounded-2xl"
+        style={{ backgroundColor: '#0F172A' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          onClick={onClose}
+          aria-label="Fechar"
+          className="absolute top-4 right-4 text-xl leading-none transition-colors"
+          style={{ color: '#64748B' }}
+        >✕</button>
+        <div className="px-8 pt-10 pb-9 text-center">
+          {logoUrl ? (
+            <img src={logoUrl} alt={storeName || 'Logo'} className="h-7 w-auto mx-auto mb-8" />
+          ) : (
+            <div className="flex items-center justify-center gap-2 mb-8">
+              {BRAND_ICON && <img src={BRAND_ICON} alt={BRAND_NAME} className="h-6 w-auto" />}
+              <span className="f-display font-bold" style={{ fontSize: '18px', color: '#ffffff' }}>{storeName || BRAND_NAME}</span>
+            </div>
+          )}
+          <h2 className="f-display font-bold leading-tight" style={{ fontSize: '24px', color: '#ffffff' }}>
+            Boas-vindas!
+          </h2>
+          <p className="f-body text-[14px] leading-relaxed mt-4" style={{ color: '#94A3B8' }}>
+            {welcomeMessage || 'Aproveite nosso catálogo com as últimas novidades.'}
+          </p>
+          <button onClick={onClose} className="btn-primary w-full mt-8">
+            Ver catálogo
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Lightbox({ photos, index, onClose, onNav }) {
+  useEffect(() => {
+    if (index === null || index === undefined) return;
+    const handleKey = (e) => {
+      if (e.key === 'ArrowLeft') onNav(-1);
+      else if (e.key === 'ArrowRight') onNav(1);
+      else if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [index, onNav, onClose]);
+
+  if (index === null || index === undefined) return null;
+  return (
+    <div
+      className="fixed inset-0 bg-slate-900/95 z-50 flex items-center justify-center px-4"
+      style={{ backdropFilter: 'blur(2px)' }}
+      onClick={onClose}
+    >
+      <button onClick={onClose} className="lightbox-icon-btn absolute top-6 right-6" style={{ fontSize: '16px' }}>✕</button>
+      {photos.length > 1 && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onNav(-1); }}
+          className="lightbox-icon-btn absolute left-3 sm:left-8"
+          style={{ fontSize: '20px' }}
+        >‹</button>
+      )}
+      <img
+        src={photos[index]}
+        alt=""
+        onClick={(e) => { e.stopPropagation(); if (photos.length > 1) onNav(1); }}
+        className="max-h-[85vh] max-w-full object-contain cursor-pointer"
+        style={{ viewTransitionName: 'active-photo' }}
+      />
+      {photos.length > 1 && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onNav(1); }}
+          className="lightbox-icon-btn absolute right-3 sm:right-8"
+          style={{ fontSize: '20px' }}
+        >›</button>
+      )}
+    </div>
+  );
+}
+
+function LookCard({ product, onAddToCart, onOpenLightbox, activeSourceKey }) {
+  const photos = product.photos || [];
+  const variants = product.variants || [];
+  const allOutOfStock = variants.length > 0 && variants.every(v => !v.inStock);
+  const availableColors = [...new Set(variants.filter(v => v.inStock).map(v => v.color))];
+  const [selectedColor, setSelectedColor] = useState(availableColors[0] || null);
+  const singleSizeFor = (color) => { const s = variants.filter(v => v.color === color && v.inStock).map(v => v.size); return s.length === 1 ? s[0] : null; };
+  const [selectedSize, setSelectedSize] = useState(() => singleSizeFor(availableColors[0]));
+  const [qty, setQty] = useState(1);
+  const [showDetails, setShowDetails] = useState(false);
+
+  const sizesForColor = variants.filter(v => v.color === selectedColor && v.inStock);
+  const canAdd = selectedColor && selectedSize && !allOutOfStock;
+  const sourceKey = `${product.id}-0`;
+
+  const add = () => {
+    if (!canAdd) return;
+    onAddToCart({ productId: product.id, name: product.name, color: selectedColor, size: selectedSize, price: product.price, qty });
+    setQty(1);
+  };
+
+  return (
+    <div className="look-card h-full flex flex-col">
+      <div
+        className="look-photo relative overflow-hidden bg-slate-50 cursor-pointer"
+        style={{ aspectRatio: '4 / 5' }}
+        onClick={() => photos.length && onOpenLightbox(photos, 0, sourceKey)}
+      >
+        {photos[0] ? (
+          <img
+            src={photos[0]} alt={product.name}
+            className="w-full h-full object-cover"
+            style={{
+              ...(allOutOfStock ? { filter: 'grayscale(1)', opacity: 0.45 } : {}),
+              viewTransitionName: activeSourceKey === sourceKey ? 'active-photo' : 'none',
+            }}
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <span className="eyebrow">sem foto</span>
+          </div>
+        )}
+        {allOutOfStock && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="eyebrow border-t border-b py-2.5" style={{ letterSpacing: '0.3em', paddingLeft: '4px', paddingRight: '4px', color: '#0F172A', borderColor: 'rgba(15,23,42,0.5)' }}>ESGOTADO</span>
+          </div>
+        )}
+      </div>
+
+      {photos.length > 1 && (
+        <div className="flex gap-1.5 mt-2">
+          {photos.map((ph, i) => (
+            <img
+              key={i} src={ph} alt=""
+              onClick={() => onOpenLightbox(photos, i, `${product.id}-${i}`)}
+              className="w-11 h-11 object-cover cursor-pointer opacity-70 hover:opacity-100 transition-opacity"
+              style={{ viewTransitionName: activeSourceKey === `${product.id}-${i}` ? 'active-photo' : 'none' }}
+            />
+          ))}
+        </div>
+      )}
+
+      <div className="pt-4 flex flex-col flex-1">
+        {product.category && <div className="eyebrow mb-1.5">{product.category}</div>}
+        <div className="f-display text-[19px] leading-snug font-semibold" style={{ color: '#0F172A' }}>{product.name}</div>
+        {(product.description || product.notes) && (
+          <div className="mt-1.5">
+            <button
+              onClick={() => setShowDetails(s => !s)}
+              className="details-toggle"
+            >Detalhes do produto</button>
+            {showDetails && (
+              <div className="mt-2">
+                {product.description && <div className="f-body text-[13px] text-slate-500 leading-relaxed">{product.description}</div>}
+                {product.notes && <div className="f-body text-[12px] text-slate-500 italic mt-1">{product.notes}</div>}
+              </div>
+            )}
+          </div>
+        )}
+
+        {availableColors.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mt-4">
+            {availableColors.map(c => (
+              <button
+                key={c}
+                onClick={() => { setSelectedColor(c); setSelectedSize(singleSizeFor(c)); }}
+                className={`size-pill ${selectedColor === c ? 'selected' : ''}`}
+              >{c}</button>
+            ))}
+          </div>
+        )}
+
+        {selectedColor && sizesForColor.length > 0 && !(sizesForColor.length === 1 && sizesForColor[0].size === SINGLE_SIZE) && (
+          <div className="flex flex-wrap gap-1.5 mt-2">
+            {sizesForColor.map(v => (
+              <button
+                key={v.size}
+                onClick={() => setSelectedSize(v.size)}
+                className={`size-pill ${selectedSize === v.size ? 'selected' : ''}`}
+              >{v.size}</button>
+            ))}
+          </div>
+        )}
+
+        <div className="flex items-center justify-between gap-4 mt-5 pt-4 border-t border-slate-200">
+          <span className="f-mono text-[17px]" style={{ color: '#0F172A' }}>{formatBRL(product.price)}</span>
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="eyebrow" style={{ letterSpacing: '0.08em' }}>qtd</span>
+            <input
+              type="number" min="1" value={qty}
+              onChange={e => setQty(Math.max(1, Number(e.target.value) || 1))}
+              className="fw-input w-11 text-center"
+              style={{ padding: '5px 4px', fontSize: '13px' }}
+            />
+          </div>
+        </div>
+
+        <button onClick={add} disabled={!canAdd} className="btn-primary w-full mt-3">
+          {allOutOfStock ? 'Esgotado' : !selectedColor ? 'Escolha o aroma' : !selectedSize ? 'Escolha o tamanho' : 'Adicionar à sacola'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function App() {
+  const [catalog, setCatalog] = useState(undefined);
+  const [cart, setCart] = useState([]);
+  const [payment, setPayment] = useState('pix');
+  const [clientName, setClientName] = useState('');
+  const [lightbox, setLightbox] = useState(null);
+  const [cartCollapsed, setCartCollapsed] = useState(false);
+  const [search, setSearch] = useState('');
+  const [activeCategory, setActiveCategory] = useState(null);
+  const [showWelcome, setShowWelcome] = useState(() => {
+    try { return sessionStorage.getItem('seiva_welcome_seen') !== '1'; } catch (e) { return true; }
+  });
+  const closeWelcome = () => {
+    setShowWelcome(false);
+    try { sessionStorage.setItem('seiva_welcome_seen', '1'); } catch (e) { /* ignore */ }
+  };
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data, error } = await sb.from('catalog_public').select('*').eq('user_id', SHARED_STORE_ID).maybeSingle();
+        if (error) throw error;
+        setCatalog(data || null);
+      } catch (e) {
+        console.error('Erro ao carregar catálogo:', e);
+        setCatalog(null);
+      }
+    })();
+  }, []);
+
+  const addToCart = (item) => {
+    setCart(c => {
+      const existing = c.find(i => i.productId === item.productId && i.color === item.color && i.size === item.size);
+      if (existing) return c.map(i => i === existing ? { ...i, qty: i.qty + item.qty } : i);
+      return [...c, item];
+    });
+  };
+
+  const removeFromCart = (idx) => setCart(c => c.filter((_, i) => i !== idx));
+  const subtotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
+  const itemCount = cart.reduce((s, i) => s + i.qty, 0);
+
+  const [couponCode, setCouponCode] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState(null); // { code, discount_type, discount_value }
+  const [couponMessage, setCouponMessage] = useState('');
+  const [couponLoading, setCouponLoading] = useState(false);
+  const [sendingOrder, setSendingOrder] = useState(false);
+
+  const applyCoupon = async () => {
+    if (!couponCode.trim()) return;
+    setCouponLoading(true);
+    setCouponMessage('');
+    try {
+      const { data, error } = await sb.from('coupons').select('*').ilike('code', couponCode.trim()).maybeSingle();
+      if (error) throw error;
+      if (!data) {
+        setAppliedCoupon(null);
+        setCouponMessage('Cupom não encontrado');
+        return;
+      }
+      if (!data.active) {
+        setAppliedCoupon(null);
+        setCouponMessage('Cupom inativo');
+        return;
+      }
+      const today = new Date().toISOString().slice(0, 10);
+      if (data.valid_until && data.valid_until < today) {
+        setAppliedCoupon(null);
+        setCouponMessage('Cupom expirado');
+        return;
+      }
+      if (data.max_uses != null && data.current_uses >= data.max_uses) {
+        setAppliedCoupon(null);
+        setCouponMessage('Cupom esgotado');
+        return;
+      }
+      // Só valida aqui — o uso só é contabilizado no banco quando o pedido é de fato enviado.
+      setAppliedCoupon({ code: data.code, discount_type: data.discount_type, discount_value: data.discount_value });
+      setCouponMessage('Cupom válido! Será aplicado ao enviar o pedido.');
+    } catch (e) {
+      console.error('Erro ao validar cupom:', e);
+      setAppliedCoupon(null);
+      setCouponMessage('Erro ao validar cupom. Tente novamente.');
+    } finally {
+      setCouponLoading(false);
+    }
+  };
+
+  const removeCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponCode('');
+    setCouponMessage('');
+  };
+
+  const discountAmount = appliedCoupon
+    ? (appliedCoupon.discount_type === 'percent'
+        ? subtotal * (Number(appliedCoupon.discount_value) / 100)
+        : Math.min(subtotal, Number(appliedCoupon.discount_value)))
+    : 0;
+  const total = Math.max(0, subtotal - discountAmount);
+
+  const openLightbox = (photos, index, sourceKey) => {
+    const apply = () => setLightbox({ photos, index, sourceKey });
+    if (document.startViewTransition) document.startViewTransition(() => flushSync(apply));
+    else apply();
+  };
+  const closeLightbox = () => {
+    const apply = () => setLightbox(null);
+    if (document.startViewTransition) document.startViewTransition(() => flushSync(apply));
+    else apply();
+  };
+  const navLightbox = (delta) => {
+    const apply = () => setLightbox(lb => lb ? { ...lb, index: (lb.index + delta + lb.photos.length) % lb.photos.length } : lb);
+    if (document.startViewTransition) document.startViewTransition(() => flushSync(apply));
+    else apply();
+  };
+
+  const buildMessage = () => {
+    const storeName = (catalog && catalog.store_name) || 'Loja';
+    const lines = [];
+    lines.push(`Novo pedido - ${storeName}`);
+    if (clientName.trim()) lines.push(`Cliente: ${clientName.trim()}`);
+    lines.push('');
+    cart.forEach(item => {
+      lines.push(`${item.qty}x ${item.name} (${variantLabel(item.color, item.size)}) - ${formatBRL(item.price)} un. = ${formatBRL(item.price * item.qty)}`);
+    });
+    lines.push('');
+    lines.push(`Subtotal: ${formatBRL(subtotal)}`);
+    if (appliedCoupon) {
+      const discountLabel = appliedCoupon.discount_type === 'percent' ? `${appliedCoupon.discount_value}%` : formatBRL(appliedCoupon.discount_value);
+      lines.push(`Cupom ${appliedCoupon.code} (-${discountLabel}): -${formatBRL(discountAmount)}`);
+    }
+    lines.push(`Total: ${formatBRL(total)}`);
+    const paymentLabel = (PAYMENT_METHODS.find(p => p.value === payment) || {}).label || payment;
+    lines.push(`Forma de pagamento: ${paymentLabel}`);
+    return lines.join('\n');
+  };
+
+  const sendOrder = async () => {
+    if (cart.length === 0 || !catalog || !catalog.whatsapp_number || sendingOrder) return;
+    setSendingOrder(true);
+    try {
+      if (appliedCoupon) {
+        // Só aqui, no exato momento do envio, o uso do cupom é de fato contabilizado no banco.
+        const { data, error } = await sb.rpc('redeem_coupon', { p_code: appliedCoupon.code });
+        if (error) throw error;
+        const result = Array.isArray(data) ? data[0] : data;
+        if (!result || !result.success) {
+          setCouponMessage((result && result.message) || 'Cupom não pôde ser aplicado. Revise antes de enviar.');
+          setAppliedCoupon(null);
+          return;
+        }
+      }
+      const msg = encodeURIComponent(buildMessage());
+      const phone = catalog.whatsapp_number.replace(/\D/g, '');
+      window.open(`https://wa.me/${phone}?text=${msg}`, '_blank');
+    } catch (e) {
+      console.error('Erro ao enviar pedido:', e);
+      setCouponMessage('Erro ao processar o pedido. Tente novamente.');
+    } finally {
+      setSendingOrder(false);
+    }
+  };
+
+  if (catalog === undefined) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center f-body">
+        <Fonts />
+        <span className="eyebrow">carregando catálogo</span>
+      </div>
+    );
+  }
+
+  if (!catalog || !catalog.products || catalog.products.length === 0) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center f-body text-sm px-4 text-center">
+        <Fonts />
+        <span className="text-slate-400">Catálogo ainda não publicado ou sem produtos disponíveis no momento.</span>
+      </div>
+    );
+  }
+
+  const categories = [...new Set(catalog.products.map(p => p.category).filter(Boolean))];
+  const filteredProducts = catalog.products.filter(p => {
+    const matchesCategory = !activeCategory || p.category === activeCategory;
+    const q = search.trim().toLowerCase();
+    const matchesSearch = !q || p.name.toLowerCase().includes(q) || (p.variants || []).some(v => String(v.color).toLowerCase().includes(q));
+    return matchesCategory && matchesSearch;
+  });
+
+  return (
+    <div className="min-h-screen f-body pb-40" style={{ backgroundColor: '#ffffff' }}>
+      <Fonts />
+
+      {showWelcome && <WelcomeBanner storeName={catalog.store_name} logoUrl={catalog.logo_url} welcomeMessage={catalog.welcome_message} onClose={closeWelcome} />}
+
+      <div className="max-w-6xl mx-auto px-6 pt-10 pb-8">
+        {catalog.logo_url ? (
+          <img src={catalog.logo_url} alt={catalog.store_name || 'Logo'} className="h-9 sm:h-10 w-auto mb-9" />
+        ) : (
+          <div className="f-display font-bold mb-9" style={{ fontSize: '28px', color: '#0F172A' }}>{catalog.store_name || 'Catálogo'}</div>
+        )}
+
+        <div className="flex items-center gap-2 mb-4">
+          <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#6C5BFF', display: 'inline-block' }}></span>
+          <span className="eyebrow">catálogo digital</span>
+        </div>
+        <h1 className="f-display font-bold leading-[1.15]" style={{ fontSize: 'clamp(28px, 5vw, 42px)', color: '#0F172A' }}>
+          Confira nossa coleção<br /><span style={{ color: 'rgb(107 107 102)' }}>completa.</span>
+        </h1>
+        <p className="f-body text-[14px] text-slate-500 mt-4 max-w-md leading-relaxed">
+          Navegue por todas as velas e aromas da loja — fotos, aromas e tamanhos de cada produto, tudo em um só lugar.
+        </p>
+
+        {catalog.tagline && (
+          <div
+            className="relative w-full flex items-center justify-center overflow-hidden mt-8"
+            style={{ height: '52px', backgroundColor: '#F5F3FF', borderTop: '1px solid #E5E1FF', borderBottom: '1px solid #E5E1FF' }}
+          >
+            {catalog.logo_url ? (
+              <img
+                src={catalog.logo_url} alt={catalog.store_name || 'Logo'}
+                className="brand-fade absolute"
+                style={{ height: '20px', width: 'auto' }}
+              />
+            ) : (
+              <span className="brand-fade absolute f-display font-bold" style={{ fontSize: '18px', color: '#0F172A' }}>{catalog.store_name || ''}</span>
+            )}
+            <span
+              className="slogan-fade absolute f-display font-bold text-center px-6"
+              style={{ color: '#6C5BFF', fontSize: 'clamp(15px, 3vw, 20px)' }}
+            >{catalog.tagline}</span>
+          </div>
+        )}
+
+        <div className="flex flex-wrap items-center gap-2.5 mt-7">
+          <input
+            className="search-input flex-1 min-w-[180px]"
+            placeholder="Buscar vela ou aroma..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+          <button onClick={() => setActiveCategory(null)} className={`pill ${!activeCategory ? 'selected' : ''}`}>Todas</button>
+          {categories.map(c => (
+            <button key={c} onClick={() => setActiveCategory(c)} className={`pill ${activeCategory === c ? 'selected' : ''}`}>{c}</button>
+          ))}
+        </div>
+      </div>
+
+      <div className="border-t border-slate-200" />
+
+      <main className="max-w-6xl mx-auto px-6 py-10">
+        {filteredProducts.length === 0 ? (
+          <div className="text-center text-slate-500 text-sm py-16">Nenhum produto encontrado.</div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-16">
+            {filteredProducts.map((p) => (
+              <LookCard
+                key={p.id} product={p} onAddToCart={addToCart} onOpenLightbox={openLightbox}
+                activeSourceKey={lightbox ? lightbox.sourceKey : null}
+              />
+            ))}
+          </div>
+        )}
+      </main>
+
+      <Lightbox
+        photos={lightbox ? lightbox.photos : []}
+        index={lightbox ? lightbox.index : null}
+        onClose={closeLightbox}
+        onNav={navLightbox}
+      />
+
+      {cart.length > 0 && cartCollapsed && (
+        <button
+          onClick={() => setCartCollapsed(false)}
+          className="fixed bottom-5 right-5 z-20 flex items-center gap-2 shadow-lg"
+          style={{ backgroundColor: '#6C5BFF', color: '#fff', borderRadius: '999px', padding: '12px 18px', border: 'none' }}
+        >
+          <span className="f-body text-[13px] font-medium">Sacola</span>
+          <span
+            className="fw-mono"
+            style={{ backgroundColor: '#e11d2e', color: '#fff', borderRadius: '999px', minWidth: '20px', height: '20px', fontSize: '11px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '0 5px', fontWeight: 700 }}
+          >{itemCount}</span>
+          <span style={{ fontSize: '14px' }}>▲</span>
+        </button>
+      )}
+
+      {cart.length > 0 && !cartCollapsed && (
+        <div className="cart-drawer fixed bottom-0 left-0 right-0 z-20 border-t border-slate-200" style={{ backgroundColor: 'rgba(255,255,255,0.97)', backdropFilter: 'blur(8px)', position: 'fixed' }}>
+          <button
+            onClick={() => setCartCollapsed(true)}
+            aria-label="Recolher sacola"
+            className="absolute flex items-center justify-center gap-1.5 hover:brightness-110 transition-all"
+            style={{
+              top: '-34px', right: '24px', width: '84px', height: '34px',
+              backgroundColor: '#6C5BFF', color: '#fff', border: 'none', cursor: 'pointer',
+              borderRadius: '10px 10px 0 0', boxShadow: '0 -3px 8px rgba(0,0,0,0.12)',
+            }}
+          >
+            <span className="f-body text-[12px] font-medium">Recolher</span>
+            <span style={{ fontSize: '13px' }}>▼</span>
+          </button>
+          <div className="max-w-6xl mx-auto p-5 sm:p-6">
+            <div className="eyebrow mb-3">sacola · {itemCount} {itemCount === 1 ? 'item' : 'itens'}</div>
+            <div className="max-h-28 overflow-y-auto mb-4 space-y-1.5">
+              {cart.map((item, idx) => (
+                <div key={idx} className="flex items-center justify-between text-[13px] text-slate-600">
+                  <span className="f-body">{item.qty}x {item.name} <span className="text-slate-500">({variantLabel(item.color, item.size)})</span></span>
+                  <span className="flex items-center gap-3">
+                    <span className="f-mono">{formatBRL(item.price * item.qty)}</span>
+                    <button onClick={() => removeFromCart(idx)} className="text-slate-500 hover:text-slate-900 transition-colors">✕</button>
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-2 mb-3">
+              {appliedCoupon ? (
+                <div className="flex items-center justify-between w-full bg-slate-50 border border-slate-200 px-3 py-2">
+                  <span className="f-body text-[13px] text-slate-600">
+                    Cupom <strong className="fw-mono">{appliedCoupon.code}</strong> aplicado
+                    ({appliedCoupon.discount_type === 'percent' ? `${appliedCoupon.discount_value}%` : formatBRL(appliedCoupon.discount_value)} off)
+                  </span>
+                  <button onClick={removeCoupon} className="text-slate-500 hover:text-slate-900 transition-colors text-[13px] underline">remover</button>
+                </div>
+              ) : (
+                <>
+                  <input
+                    className="fw-input flex-1" placeholder="Código do cupom (opcional)"
+                    value={couponCode} onChange={e => setCouponCode(e.target.value.toUpperCase().replace(/\s+/g, ''))}
+                    style={{ textTransform: 'uppercase' }}
+                  />
+                  <button onClick={applyCoupon} disabled={couponLoading || !couponCode.trim()} className="fw-btn-ghost" style={{ borderColor: '#6C5BFF', color: '#6C5BFF' }}>
+                    {couponLoading ? 'Validando...' : 'Aplicar'}
+                  </button>
+                </>
+              )}
+            </div>
+            {couponMessage && !appliedCoupon && (
+              <div className="text-[12px] text-slate-500 mb-3">{couponMessage}</div>
+            )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+              <input className="fw-input" placeholder="Seu nome (opcional)" value={clientName} onChange={e => setClientName(e.target.value)} />
+              <select className="fw-input" value={payment} onChange={e => setPayment(e.target.value)}>
+                {PAYMENT_METHODS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+              </select>
+              <div className="text-right">
+                {appliedCoupon && (
+                  <div className="f-body text-[12px] text-slate-400 line-through">{formatBRL(subtotal)}</div>
+                )}
+                <div className="f-mono text-lg" style={{ color: '#0F172A' }}>
+                  {formatBRL(total)}
+                </div>
+              </div>
+            </div>
+            <button onClick={sendOrder} disabled={sendingOrder} className="btn-primary w-full">
+              {sendingOrder ? 'Enviando...' : 'Enviar pedido pelo WhatsApp'}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App />);
+</script>
+</body>
+</html>
