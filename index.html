@@ -162,6 +162,8 @@ function Fonts() {
       .seiva-details > summary::before { content: '+'; font-family: 'Montserrat', sans-serif; color: #C89A3D; font-weight: 600; width: 14px; }
       .seiva-details[open] > summary::before { content: '−'; }
       textarea.fw-input { resize: vertical; }
+      .banner-ctl { width: 32px; height: 32px; border-radius: 999px; background: rgba(255,252,246,0.92); color: #1E1D1A; display: inline-flex; align-items: center; justify-content: center; font-size: 18px; line-height: 1; }
+      .banner-ctl:disabled { opacity: 0.35; }
       @media (max-width: 767px) {
         .seiva-main { padding-bottom: calc(96px + env(safe-area-inset-bottom)) !important; }
         .fw-input { font-size: 16px !important; min-height: 44px; }
@@ -481,7 +483,7 @@ function App({ sb, session, onSignOut }) {
         burnTime: p.burnTime || '', usage: p.usage || '', story: p.story || '', warning: p.warning || '', phrase: p.phrase || '', featured: !!p.featured,
         variants: (p.variants || []).map(v => ({ color: v.color, size: v.size, inStock: v.stock > 0 })),
       }));
-      const { error } = await sb.from('catalog_public').upsert({
+      const row = {
         user_id: SHARED_STORE_ID,
         whatsapp_number: (data.catalogSettings && data.catalogSettings.whatsappNumber) || '',
         store_name: (data.catalogSettings && data.catalogSettings.storeName) || 'Minha Loja',
@@ -490,7 +492,16 @@ function App({ sb, session, onSignOut }) {
         welcome_message: (data.catalogSettings && data.catalogSettings.welcomeMessage) || '',
         products: snapshot,
         updated_at: new Date().toISOString(),
-      });
+      };
+      const banners = ((data.catalogSettings && data.catalogSettings.banners) || []).filter(b => b && b.url);
+      let { error } = await sb.from('catalog_public').upsert({ ...row, banners });
+      if (error && /banners/i.test(error.message || '')) {
+        // A coluna "banners" ainda não existe no banco: publica o resto e avisa.
+        ({ error } = await sb.from('catalog_public').upsert(row));
+        if (error) throw error;
+        setPublishState('published-no-banners');
+        return;
+      }
       if (error) throw error;
       setPublishState('published');
     } catch (e) {
@@ -1061,6 +1072,81 @@ function ProductsTab({ sb, products, onAdd, onUpdate, onDelete }) {
 }
 
 // ---------- Catalog (vitrine pública) ----------
+// ---------- Fotos do banner do catálogo ----------
+// Reduz a foto no próprio aparelho antes de enviar (fotos de celular costumam ter vários MB).
+async function shrinkImage(file, maxSide = 1800, quality = 0.82) {
+  try {
+    const bmp = await createImageBitmap(file);
+    const scale = Math.min(1, maxSide / Math.max(bmp.width, bmp.height));
+    const c = document.createElement('canvas');
+    c.width = Math.round(bmp.width * scale); c.height = Math.round(bmp.height * scale);
+    c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+    const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', quality));
+    return blob || file;
+  } catch (e) { return file; }
+}
+
+function BannerManager({ sb, banners, onChange }) {
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState('');
+  const list = banners || [];
+  const MAX = 8;
+  const addFiles = async (e) => {
+    const files = [...e.target.files].slice(0, MAX - list.length);
+    e.target.value = '';
+    if (!files.length) return;
+    setError(''); setUploading(true);
+    const added = [];
+    try {
+      for (const f of files) {
+        const blob = await shrinkImage(f);
+        const path = `banner_${uid('b')}.jpg`;
+        const { error: upErr } = await sb.storage.from('product-photos').upload(path, blob, { upsert: true, contentType: 'image/jpeg' });
+        if (upErr) throw upErr;
+        added.push({ url: sb.storage.from('product-photos').getPublicUrl(path).data.publicUrl });
+      }
+    } catch (err) {
+      setError('Erro ao enviar: ' + (err.message || 'tente novamente'));
+    } finally {
+      if (added.length) onChange([...list, ...added]);
+      setUploading(false);
+    }
+  };
+  const move = (i, d) => { const n = [...list]; const j = i + d; if (j < 0 || j >= n.length) return; [n[i], n[j]] = [n[j], n[i]]; onChange(n); };
+  const remove = (i) => onChange(list.filter((_, k) => k !== i));
+  return (
+    <div className="bg-white border border-slate-200 rounded-xl p-4">
+      <p className="text-[13px] text-slate-600 mb-3 leading-relaxed">
+        Essas fotos passam no banner principal do catálogo, na ordem abaixo. Prefira fotos com o produto no centro.
+        Se não houver nenhuma, o catálogo usa as fotos-padrão da Seiva. Depois de mudar, clique em <strong>Publicar catálogo agora</strong>.
+      </p>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+        {list.map((b, i) => (
+          <div key={b.url + i} className="relative rounded-lg overflow-hidden border border-slate-200" style={{ aspectRatio: '4 / 3', background: '#EFE6D2' }}>
+            <img src={b.url} alt="" className="w-full h-full object-cover" />
+            <span className="absolute top-1.5 left-1.5 fw-mono text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ background: '#314A3A', color: '#fff' }}>{i + 1}</span>
+            <div className="absolute bottom-0 left-0 right-0 flex justify-between p-1.5" style={{ background: 'linear-gradient(transparent, rgba(30,29,26,0.55))' }}>
+              <div className="flex gap-1">
+                <button type="button" onClick={() => move(i, -1)} disabled={i === 0} className="banner-ctl" aria-label="Mover para a esquerda">‹</button>
+                <button type="button" onClick={() => move(i, 1)} disabled={i === list.length - 1} className="banner-ctl" aria-label="Mover para a direita">›</button>
+              </div>
+              <button type="button" onClick={() => remove(i)} className="banner-ctl" aria-label="Remover"><X size={14} /></button>
+            </div>
+          </div>
+        ))}
+        {list.length < MAX && (
+          <label className="rounded-lg border-2 border-dashed flex flex-col items-center justify-center gap-1 cursor-pointer text-[12px] text-center px-2" style={{ aspectRatio: '4 / 3', borderColor: '#E4D9C4', color: '#6E6558' }}>
+            <input type="file" accept="image/*" multiple className="hidden" onChange={addFiles} disabled={uploading} />
+            {uploading ? 'Enviando...' : <><Plus size={20} /><span>Adicionar fotos</span></>}
+          </label>
+        )}
+      </div>
+      {error && <div className="text-[12px] text-red-700 mt-2">{error}</div>}
+      <div className="text-[11px] text-slate-400 mt-2">{list.length}/{MAX} fotos</div>
+    </div>
+  );
+}
+
 function CatalogTab({ sb, products, settings, onSaveSettings, onPublish, publishState }) {
   const [waNumber, setWaNumber] = useState((settings && settings.whatsappNumber) || '');
   const [storeName, setStoreName] = useState((settings && settings.storeName) || '');
@@ -1104,6 +1190,10 @@ function CatalogTab({ sb, products, settings, onSaveSettings, onPublish, publish
         </div>
       </Section>
 
+      <Section title="Fotos do banner">
+        <BannerManager sb={sb} banners={(settings && settings.banners) || []} onChange={banners => onSaveSettings({ banners })} />
+      </Section>
+
       <Section title="Publicar catálogo">
         <div className="bg-white border border-slate-200 p-4">
           <div className="text-[13px] text-slate-600 mb-3">
@@ -1114,6 +1204,7 @@ function CatalogTab({ sb, products, settings, onSaveSettings, onPublish, publish
           </button>
           {!waNumber && <div className="text-[12px] text-red-700 bg-red-50 border border-red-200 rounded-lg p-2 mb-4">Preencha e salve o número de WhatsApp antes de publicar.</div>}
           {publishState === 'published' && <div className="text-[12px] text-green-700 bg-green-50 border border-green-200 rounded-lg p-2 mb-4">Catálogo publicado com sucesso.</div>}
+          {publishState === 'published-no-banners' && <div className="text-[12px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2 mb-4">Catálogo publicado, mas as fotos do banner não foram enviadas: rode o arquivo seiva-banner.sql no SQL Editor do Supabase e publique de novo.</div>}
           {publishState === 'error' && <div className="text-[12px] text-red-700 bg-red-50 border border-red-200 rounded-lg p-2 mb-4">Erro ao publicar. Confira se rodou o seiva-setup.sql no Supabase.</div>}
 
           {catalogUrl && (
