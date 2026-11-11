@@ -164,6 +164,16 @@ function Fonts() {
       textarea.fw-input { resize: vertical; }
       .banner-ctl { width: 32px; height: 32px; border-radius: 999px; background: rgba(255,252,246,0.92); color: #1E1D1A; display: inline-flex; align-items: center; justify-content: center; font-size: 18px; line-height: 1; }
       .banner-ctl:disabled { opacity: 0.35; }
+      .qty-field { display: inline-flex; align-items: stretch; border: 1px solid #E4D9C4; border-radius: 10px; background: #FFFCF6; overflow: hidden; height: 44px; flex-shrink: 0; }
+      .qty-field.is-focused { border-color: #656149; box-shadow: 0 0 0 3px rgba(200,154,61,0.25); }
+      .qty-field.is-low { border-color: #DC2626; background: #FEF2F2; }
+      .qty-field.is-low .qty-input { color: #B91C1C; }
+      .qty-step { width: 44px; font-size: 20px; line-height: 1; color: #656149; background: transparent; }
+      .qty-step:active { background: #EFE6D2; }
+      .qty-step:disabled { color: #CFC6B4; }
+      .qty-input { width: 56px; text-align: center; font-family: 'Montserrat', sans-serif; font-size: 17px; font-weight: 600; color: #1E1D1A; background: transparent; border: 0; outline: none; border-left: 1px solid #EFE6D2; border-right: 1px solid #EFE6D2; }
+      .stock-row + .stock-row { border-top: 1px dashed #EFE6D2; }
+      @media (max-width: 767px) { .qty-input { font-size: 18px !important; width: 60px; } .qty-step { width: 48px; } .qty-field { height: 48px; } }
       @media (max-width: 767px) {
         .seiva-main { padding-bottom: calc(96px + env(safe-area-inset-bottom)) !important; }
         .fw-input { font-size: 16px !important; min-height: 44px; }
@@ -1395,51 +1405,96 @@ function ClientsTab({ clients, onAdd, onDelete }) {
 }
 
 // ---------- Stock ----------
+// Campo de quantidade fácil de digitar: teclado numérico, seleciona tudo ao tocar,
+// aceita apagar e digitar de novo, salva ao sair do campo ou no Enter, e tem botões − / + grandes.
+function QtyField({ value, onCommit, low = false, label }) {
+  const [text, setText] = useState(String(value ?? 0));
+  const [focused, setFocused] = useState(false);
+  useEffect(() => { if (!focused) setText(String(value ?? 0)); }, [value, focused]);
+  const commit = (raw) => {
+    const n = Math.max(0, parseInt(String(raw).replace(/\D/g, ''), 10) || 0);
+    setText(String(n));
+    if (n !== Number(value)) onCommit(n);
+  };
+  const bump = (d) => { const n = Math.max(0, (parseInt(text, 10) || 0) + d); setText(String(n)); onCommit(n); };
+  return (
+    <div className={`qty-field ${low ? 'is-low' : ''} ${focused ? 'is-focused' : ''}`}>
+      <button type="button" className="qty-step" onClick={() => bump(-1)} aria-label={`Diminuir ${label || ''}`} disabled={(parseInt(text, 10) || 0) <= 0}>−</button>
+      <input
+        className="qty-input" type="text" inputMode="numeric" pattern="[0-9]*" enterKeyHint="next"
+        aria-label={label} value={text}
+        onFocus={e => { setFocused(true); const t = e.target; setTimeout(() => t.select(), 0); }}
+        onChange={e => setText(e.target.value.replace(/\D/g, '').slice(0, 5))}
+        onBlur={() => { setFocused(false); commit(text); }}
+        onKeyDown={e => {
+          if (e.key === 'Enter') {
+            e.preventDefault(); commit(text);
+            const all = [...document.querySelectorAll('.qty-input')];
+            const next = all[all.indexOf(e.target) + 1];
+            if (next) next.focus(); else e.target.blur();
+          } else if (e.key === 'ArrowUp') { e.preventDefault(); bump(1); }
+          else if (e.key === 'ArrowDown') { e.preventDefault(); bump(-1); }
+        }}
+      />
+      <button type="button" className="qty-step" onClick={() => bump(1)} aria-label={`Aumentar ${label || ''}`}>+</button>
+    </div>
+  );
+}
+
 function StockTab({ products, onSetStock, onUpdateProduct }) {
+  const [query, setQuery] = useState('');
+  const [onlyLow, setOnlyLow] = useState(false);
+  const q = query.trim().toLowerCase();
+  const isLow = (p, v) => v.stock <= (p.minStock ?? 3);
+  const visible = products
+    .map(p => ({
+      p,
+      variants: p.variants.filter(v =>
+        (!onlyLow || isLow(p, v)) &&
+        (!q || p.name.toLowerCase().includes(q) || String(v.color).toLowerCase().includes(q) || String(v.size).toLowerCase().includes(q))),
+    }))
+    .filter(x => x.variants.length > 0);
+  const lowCount = products.reduce((n, p) => n + p.variants.filter(v => isLow(p, v)).length, 0);
   return (
     <div>
-      <Section title="Controle de estoque por aroma e tamanho">
+      <Section title="Controle de estoque">
         {products.length === 0 && <div className="text-slate-400 text-sm">Cadastre produtos primeiro na aba Produtos.</div>}
-        {products.map(p => {
-          const colors = [...new Set(p.variants.map(v => v.color))];
-          const sizes = [...new Set(p.variants.map(v => v.size))];
-          return (
-            <div key={p.id} className="bg-white border border-slate-200 p-4 mb-4">
-              <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-                <div className="fw-display text-[20px] font-semibold leading-tight" style={{ color: '#1E1D1A' }}>{p.name}</div>
-                <label className="flex items-center gap-2 text-xs text-slate-500">
-                  Estoque mínimo:
-                  <input type="number" className="fw-input w-16" value={p.minStock ?? 3} onChange={e => onUpdateProduct(p.id, { minStock: Number(e.target.value) })} />
-                </label>
+        {products.length > 0 && (
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-4">
+            <input className="fw-input sm:max-w-xs" placeholder="Buscar produto ou aroma" value={query} onChange={e => setQuery(e.target.value)} />
+            <button type="button" onClick={() => setOnlyLow(v => !v)} className="fw-btn-ghost" style={onlyLow ? { borderColor: '#DC2626', color: '#B91C1C', background: '#FEF2F2' } : {}}>
+              {onlyLow ? '✓ ' : ''}Só estoque baixo ({lowCount})
+            </button>
+          </div>
+        )}
+        <p className="text-[12px] text-slate-500 mb-3">Toque no número para digitar, ou use − e +. Salva sozinho.<span className="hidden md:inline"> Enter passa para o próximo item.</span></p>
+        {visible.length === 0 && products.length > 0 && <div className="text-slate-400 text-sm py-6 text-center">Nenhum item encontrado.</div>}
+        {visible.map(({ p, variants }) => (
+          <div key={p.id} className="bg-white border border-slate-200 rounded-xl mb-3 overflow-hidden">
+            <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3" style={{ borderBottom: '1px solid #EFE6D2' }}>
+              <div className="fw-display text-[20px] font-semibold leading-tight" style={{ color: '#1E1D1A' }}>{p.name}</div>
+              <div className="flex items-center gap-2 text-[12px] text-slate-500">
+                Estoque mínimo
+                <QtyField value={p.minStock ?? 3} label={`estoque mínimo de ${p.name}`} onCommit={n => onUpdateProduct(p.id, { minStock: n })} />
               </div>
-              <table className="w-full fw-table">
-                <thead><tr><th>Aroma</th>{sizes.map(s => <th key={s} className="text-center">{s}</th>)}</tr></thead>
-                <tbody>
-                  {colors.map(color => (
-                    <tr key={color}>
-                      <td className="font-medium">{color}</td>
-                      {sizes.map(size => {
-                        const v = p.variants.find(v => v.color === color && v.size === size);
-                        const low = v && v.stock <= (p.minStock ?? 3);
-                        return (
-                          <td key={size} className="text-center">
-                            <input
-                              type="number" min="0"
-                              className="fw-input w-16 text-center"
-                              style={low ? { borderColor: '#DC2626', color: '#B91C1C', backgroundColor: '#FEF2F2', fontWeight: 700, boxShadow: '0 0 0 1px #DC2626' } : {}}
-                              value={v ? v.stock : 0}
-                              onChange={e => onSetStock(p.id, color, size, e.target.value)}
-                            />
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
             </div>
-          );
-        })}
+            {variants.map(v => {
+              const low = isLow(p, v);
+              return (
+                <div key={v.color + '|' + v.size} className="stock-row flex items-center justify-between gap-3 px-4 py-2.5">
+                  <div className="min-w-0">
+                    <div className="text-[14px] font-medium text-slate-800 truncate">{v.color}</div>
+                    <div className="text-[12px] text-slate-500 flex items-center gap-2">
+                      {v.size !== SINGLE_SIZE && <span>{v.size}</span>}
+                      {low && <span className="fw-mono text-[10.5px] font-semibold px-1.5 py-0.5 rounded" style={{ background: '#FEF2F2', color: '#B91C1C' }}>{v.stock === 0 ? 'Esgotado' : 'Estoque baixo'}</span>}
+                    </div>
+                  </div>
+                  <QtyField value={v.stock} low={low} label={`estoque de ${p.name} ${v.color} ${v.size}`} onCommit={n => onSetStock(p.id, v.color, v.size, n)} />
+                </div>
+              );
+            })}
+          </div>
+        ))}
       </Section>
     </div>
   );
