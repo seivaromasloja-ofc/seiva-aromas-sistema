@@ -131,7 +131,7 @@ const NAV = [
 function Fonts() {
   return (
     <style>{`
-      @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Montserrat:wght@400;500;600;700&display=swap');
+      @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500;1,600&family=Montserrat:wght@400;500;600;700&display=swap');
       .fw-display { font-family: 'Cormorant Garamond', serif; }
       .fw-logo { font-family: 'Cormorant Garamond', serif; font-weight: 700; letter-spacing: 0.02em; }
       .fw-mono { font-family: 'Montserrat', sans-serif; font-variant-numeric: tabular-nums; }
@@ -157,6 +157,11 @@ function Fonts() {
       .fw-table td { padding: 9px 10px; border-bottom: 1px solid #F3F4F8; font-size: 13px; color: #1E293B; }
       .fw-table tr:hover td { background: #F8F9FC; }
 
+      .seiva-details { border: 1px solid #E4D9C4; border-radius: 10px; padding: 12px 14px; background: #FFFCF6; }
+      .seiva-details > summary { cursor: pointer; font-family: 'Cormorant Garamond', serif; font-size: 17px; font-weight: 600; color: #314A3A; list-style: none; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+      .seiva-details > summary::before { content: '+'; font-family: 'Montserrat', sans-serif; color: #C89A3D; font-weight: 600; width: 14px; }
+      .seiva-details[open] > summary::before { content: '−'; }
+      textarea.fw-input { resize: vertical; }
       @media (max-width: 767px) {
         .seiva-main { padding-bottom: calc(96px + env(safe-area-inset-bottom)) !important; }
         .fw-input { font-size: 16px !important; min-height: 44px; }
@@ -242,7 +247,7 @@ function Section({ title, action, children }) {
   return (
     <div className="mb-7">
       <div className="flex items-center justify-between mb-3">
-        <h2 className="fw-display text-[15px] font-semibold text-slate-800">{title}</h2>
+        <h2 className="fw-display text-[22px] md:text-[23px] font-semibold leading-tight" style={{ color: '#1E1D1A' }}>{title}</h2>
         {action}
       </div>
       {children}
@@ -472,6 +477,8 @@ function App({ sb, session, onSignOut }) {
         id: p.id, name: p.name, category: p.category,
         photos: p.photos || [], price: p.retail || 0,
         description: p.description || '', notes: p.notes || '',
+        subtitle: p.subtitle || '', aromaNotes: p.aromaNotes || '', family: p.family || '', intensity: Number(p.intensity) || 0,
+        burnTime: p.burnTime || '', usage: p.usage || '', story: p.story || '', warning: p.warning || '', phrase: p.phrase || '', featured: !!p.featured,
         variants: (p.variants || []).map(v => ({ color: v.color, size: v.size, inStock: v.stock > 0 })),
       }));
       const { error } = await sb.from('catalog_public').upsert({
@@ -709,7 +716,7 @@ function DashboardTab({ revenueThisMonth, profitThisMonth, pendingOrders, lowSto
   return (
     <div>
       <div className="mb-6">
-        <h1 className="fw-display text-[19px] font-semibold text-slate-900">Dashboard</h1>
+        <h1 className="fw-display text-[30px] md:text-[32px] font-semibold leading-none" style={{ color: '#1E1D1A' }}>Painel</h1>
         <p className="text-[12.5px] text-slate-500 mt-0.5">Visão geral do seu negócio</p>
       </div>
 
@@ -736,7 +743,7 @@ function DashboardTab({ revenueThisMonth, profitThisMonth, pendingOrders, lowSto
 
       <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-4 mb-5">
         <div className="bg-white rounded-[10px] border border-slate-200 p-4">
-          <p className="text-[13px] font-medium text-slate-800 mb-3">Receita — últimos meses</p>
+          <p className="fw-display text-[19px] font-semibold mb-3" style={{ color: '#1E1D1A' }}>Receita — últimos meses</p>
           <div style={{ height: '190px' }}>
             {revenueByMonth.length === 0 ? <EmptyState text="Nenhuma venda registrada ainda." /> : (
               <ResponsiveContainer width="100%" height="100%">
@@ -758,7 +765,7 @@ function DashboardTab({ revenueThisMonth, profitThisMonth, pendingOrders, lowSto
           </div>
         </div>
         <div className="bg-white rounded-[10px] border border-slate-200 p-4">
-          <p className="text-[13px] font-medium text-slate-800 mb-3">Categorias mais vendidas</p>
+          <p className="fw-display text-[19px] font-semibold mb-3" style={{ color: '#1E1D1A' }}>Categorias mais vendidas</p>
           {salesByCategory.length === 0 ? <EmptyState text="Sem vendas ainda." /> : (
             <div className="flex items-center gap-4">
               <div style={{ width: '96px', height: '96px' }}>
@@ -785,7 +792,7 @@ function DashboardTab({ revenueThisMonth, profitThisMonth, pendingOrders, lowSto
 
       <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-4 mb-5">
         <div className="bg-white rounded-[10px] border border-slate-200 p-4">
-          <p className="text-[13px] font-medium text-slate-800 mb-3">Vendas recentes</p>
+          <p className="fw-display text-[19px] font-semibold mb-3" style={{ color: '#1E1D1A' }}>Vendas recentes</p>
           {recentSales.length === 0 ? <EmptyState text="Nenhuma venda registrada ainda." /> : (
             <table className="w-full fw-table">
               <thead><tr><th>Cliente</th><th>Data</th><th>Total</th><th>Tipo</th></tr></thead>
@@ -808,7 +815,7 @@ function DashboardTab({ revenueThisMonth, profitThisMonth, pendingOrders, lowSto
           )}
         </div>
         <div className="bg-white rounded-[10px] border border-slate-200 p-4">
-          <p className="text-[13px] font-medium text-slate-800 mb-3">Estoque baixo</p>
+          <p className="fw-display text-[19px] font-semibold mb-3" style={{ color: '#1E1D1A' }}>Estoque baixo</p>
           {lowStock.length === 0 ? (
             <div className="text-[12px] text-slate-500">Nenhum item abaixo do estoque mínimo.</div>
           ) : (
@@ -831,7 +838,7 @@ function DashboardTab({ revenueThisMonth, profitThisMonth, pendingOrders, lowSto
 
       <div className="rounded-[10px] px-5 py-4 flex items-center justify-between" style={{ backgroundColor: '#EFE6D2' }}>
         <div>
-          <p className="text-[13px] font-semibold mb-0.5" style={{ color: '#314A3A' }}>Mais vida em cada aroma.</p>
+          <p className="fw-display italic text-[20px] font-semibold mb-0.5" style={{ color: '#314A3A' }}>Mais vida em cada aroma.</p>
           <p className="text-[11.5px]" style={{ color: '#7A4B2A' }}>Gerencie produtos, estoque e vendas de forma simples e integrada.</p>
         </div>
       </div>
@@ -900,15 +907,15 @@ function MultiPhotoUploader({ sb, photos, onChange }) {
           <button type="button" onClick={() => setAt(i, '')} className="fw-btn-ghost"><X size={12} /></button>
         </div>
       ))}
-      {arr.length < 3 && (
+      {arr.length < 5 && (
         <PhotoUploader sb={sb} value="" onChange={u => onChange([...arr, u].filter(Boolean))} />
       )}
-      <div className="text-[11px] text-slate-400">{arr.length}/3 fotos</div>
+      <div className="text-[11px] text-slate-400">{arr.length}/5 fotos</div>
     </div>
   );
 }
 
-const EMPTY_PRODUCT_FORM = { name: '', category: '', cost: '', retail: '', wholesale: '', minStock: 3, colors: '', sizes: '', photos: [], description: '', notes: '' };
+const EMPTY_PRODUCT_FORM = { name: '', category: '', cost: '', retail: '', wholesale: '', minStock: 3, colors: '', sizes: '', photos: [], description: '', notes: '', subtitle: '', aromaNotes: '', family: '', intensity: '', burnTime: '', usage: '', story: '', warning: '', phrase: '', featured: false };
 
 function ProductsTab({ sb, products, onAdd, onUpdate, onDelete }) {
   const [form, setForm] = useState(EMPTY_PRODUCT_FORM);
@@ -921,6 +928,7 @@ function ProductsTab({ sb, products, onAdd, onUpdate, onDelete }) {
       minStock: p.minStock, colors: [...new Set(p.variants.map(v => v.color))].join(', '),
       sizes: [...new Set(p.variants.map(v => v.size))].filter(s => s !== SINGLE_SIZE).join(', '),
       photos: p.photos || [], description: p.description || '', notes: p.notes || '',
+      subtitle: p.subtitle || '', aromaNotes: p.aromaNotes || '', family: p.family || '', intensity: p.intensity || '', burnTime: p.burnTime || '', usage: p.usage || '', story: p.story || '', warning: p.warning || '', phrase: p.phrase || '', featured: !!p.featured,
     });
   };
   const cancelEdit = () => { setEditingId(null); setForm(EMPTY_PRODUCT_FORM); };
@@ -939,6 +947,8 @@ function ProductsTab({ sb, products, onAdd, onUpdate, onDelete }) {
       cost: Number(form.cost) || 0, retail: Number(form.retail) || 0, wholesale: Number(form.wholesale) || 0,
       minStock: Number(form.minStock) || 3, photos: form.photos || [],
       description: form.description || '', notes: form.notes || '',
+      subtitle: form.subtitle || '', aromaNotes: form.aromaNotes || '', family: form.family || '', intensity: Number(form.intensity) || 0,
+      burnTime: form.burnTime || '', usage: form.usage || '', story: form.story || '', warning: form.warning || '', phrase: form.phrase || '', featured: !!form.featured,
     };
 
     if (editingId) {
@@ -980,7 +990,30 @@ function ProductsTab({ sb, products, onAdd, onUpdate, onDelete }) {
           <div className="col-span-full">
             <Field label="Tamanhos (opcional, separados por vírgula — deixe vazio se a vela tiver tamanho único)"><input className="fw-input" value={form.sizes} onChange={e => setForm(f => ({ ...f, sizes: e.target.value }))} placeholder="Ex: 100g, 200g, 400g" /></Field>
           </div>
-          <div className="col-span-full"><Field label="Fotos do produto (até 3, opcional)"><MultiPhotoUploader sb={sb} photos={form.photos} onChange={photos => setForm(f => ({ ...f, photos }))} /></Field></div>
+          <details className="col-span-full seiva-details" open={!!editingId && !!(form.family || form.story || form.subtitle)}>
+            <summary>Ficha do produto no catálogo <span className="fw-body text-[11px] font-normal" style={{ color: '#9A9081' }}>(opcional — aparece na página do produto)</span></summary>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-3">
+              <Field label="Tipo (abaixo do nome)"><input className="fw-input" value={form.subtitle} onChange={e => setForm(f => ({ ...f, subtitle: e.target.value }))} placeholder="Vela aromática" /></Field>
+              <Field label="Notas do aroma"><input className="fw-input" value={form.aromaNotes} onChange={e => setForm(f => ({ ...f, aromaNotes: e.target.value }))} placeholder="Framboesa e pimenta" /></Field>
+              <Field label="Família olfativa"><input className="fw-input" value={form.family} onChange={e => setForm(f => ({ ...f, family: e.target.value }))} placeholder="Frutal especiada" /></Field>
+              <Field label="Intensidade">
+                <select className="fw-input" value={form.intensity} onChange={e => setForm(f => ({ ...f, intensity: e.target.value }))}>
+                  <option value="">Não mostrar</option>
+                  {[1, 2, 3, 4, 5].map(n => <option key={n} value={n}>{'●'.repeat(n) + '○'.repeat(5 - n)} ({n} de 5)</option>)}
+                </select>
+              </Field>
+              <Field label="Tempo de queima / duração"><input className="fw-input" value={form.burnTime} onChange={e => setForm(f => ({ ...f, burnTime: e.target.value }))} placeholder="Aproximadamente 35 horas" /></Field>
+              <Field label="Frase curta"><input className="fw-input" value={form.phrase} onChange={e => setForm(f => ({ ...f, phrase: e.target.value }))} placeholder="Frutal vibrante que floresce por dentro." /></Field>
+              <div className="sm:col-span-2 lg:col-span-3"><Field label="Modo de uso"><textarea rows={2} className="fw-input" value={form.usage} onChange={e => setForm(f => ({ ...f, usage: e.target.value }))} placeholder="Acenda em local seguro e aproveite o momento." /></Field></div>
+              <div className="sm:col-span-2 lg:col-span-3"><Field label="História da vela"><textarea rows={3} className="fw-input" value={form.story} onChange={e => setForm(f => ({ ...f, story: e.target.value }))} placeholder="Inspirada nas frutas da floresta e no fogo da transformação..." /></Field></div>
+              <div className="sm:col-span-2"><Field label="Aviso de segurança"><input className="fw-input" value={form.warning} onChange={e => setForm(f => ({ ...f, warning: e.target.value }))} placeholder="Retire o cristal antes de acender." /></Field></div>
+              <label className="flex items-center gap-2 text-[13px] text-slate-600 self-end pb-2.5">
+                <input type="checkbox" checked={!!form.featured} onChange={e => setForm(f => ({ ...f, featured: e.target.checked }))} style={{ width: '18px', height: '18px', accentColor: '#314A3A' }} />
+                Destaque no banner do catálogo
+              </label>
+            </div>
+          </details>
+          <div className="col-span-full"><Field label="Fotos do produto (até 5, opcional — a primeira é a capa)"><MultiPhotoUploader sb={sb} photos={form.photos} onChange={photos => setForm(f => ({ ...f, photos }))} /></Field></div>
           <div className="col-span-full flex justify-end gap-3">
             {editingId && <button type="button" onClick={cancelEdit} className="fw-btn-ghost">Cancelar edição</button>}
             <button className="fw-btn" type="submit">
@@ -1008,7 +1041,7 @@ function ProductsTab({ sb, products, onAdd, onUpdate, onDelete }) {
                     <div className="w-9 h-9 rounded border border-slate-200 flex items-center justify-center text-slate-600"><ImageIcon size={14} /></div>
                   )}
                 </td>
-                <td className="font-medium text-slate-900">{p.name}</td>
+                <td className="fw-display text-[17px] font-semibold" style={{ color: '#1E1D1A' }}>{p.name}</td>
                 <td>{p.category}</td>
                 <td>{formatBRL(p.cost)}</td>
                 <td>{formatBRL(p.retail)}</td>
@@ -1282,7 +1315,7 @@ function StockTab({ products, onSetStock, onUpdateProduct }) {
           return (
             <div key={p.id} className="bg-white border border-slate-200 p-4 mb-4">
               <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-                <div className="font-semibold text-slate-900">{p.name}</div>
+                <div className="fw-display text-[20px] font-semibold leading-tight" style={{ color: '#1E1D1A' }}>{p.name}</div>
                 <label className="flex items-center gap-2 text-xs text-slate-500">
                   Estoque mínimo:
                   <input type="number" className="fw-input w-16" value={p.minStock ?? 3} onChange={e => onUpdateProduct(p.id, { minStock: Number(e.target.value) })} />
@@ -1814,7 +1847,7 @@ function ExpensesTab({ finance, sales, onAdd, onDelete }) {
             </table>
           </div>
           <div className="bg-white border border-slate-200 p-4">
-            <div className="text-sm font-semibold text-slate-700 mb-3">Saídas por categoria neste mês</div>
+            <div className="fw-display text-[19px] font-semibold mb-3" style={{ color: '#1E1D1A' }}>Saídas por categoria neste mês</div>
             {byCategory.length === 0 ? <div className="text-slate-400 text-sm">Sem dados ainda.</div> : (
               <table className="w-full fw-table">
                 <thead><tr><th>Categoria</th><th>Total</th></tr></thead>
@@ -1971,7 +2004,7 @@ function ReportsTab({ sales, purchases, finance, products }) {
         </div>
 
         <div className="bg-white border border-slate-200 p-4">
-          <div className="text-sm font-semibold text-slate-700 mb-3">Produtos mais vendidos no mês</div>
+          <div className="fw-display text-[19px] font-semibold mb-3" style={{ color: '#1E1D1A' }}>Produtos mais vendidos no mês</div>
           {topProducts.length === 0 ? <div className="text-slate-400 text-sm">Sem vendas neste mês.</div> : (
             <table className="w-full fw-table">
               <thead><tr><th>Produto</th><th>Unidades vendidas</th></tr></thead>
