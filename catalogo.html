@@ -112,6 +112,8 @@ function Fonts() {
       .hero-dot { height: 8px; border-radius: 999px; transition: width .25s ease, background .25s ease; }
       .btn-cta { background: #656149; color: #FFFCF6; font-family: 'Montserrat', sans-serif; font-size: 12px; font-weight: 600; letter-spacing: 0.2em; text-transform: uppercase; padding: 15px 28px; border-radius: 4px; transition: background .2s ease; }
       .btn-cta:hover { background: #4F4C38; }
+      .btn-outline-light { border: 1px solid #E8CF95; color: #F2EBDA; font-family: 'Montserrat', sans-serif; font-size: 12px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; padding: 13px 22px; border-radius: 4px; align-items: center; gap: 8px; }
+      .btn-outline-light:hover { background: rgba(255,255,255,0.08); }
       .btn-cta-gold { background: #C89A3D; color: #1E1D1A; font-family: 'Montserrat', sans-serif; font-size: 12px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; padding: 14px 24px; border-radius: 4px; align-items: center; gap: 8px; }
 
       /* coleções */
@@ -328,6 +330,9 @@ const IconClock = (p) => <Svg {...p}><circle cx="12" cy="13" r="7.5" /><polyline
 const IconHand = (p) => <Svg {...p}><path d="M7 12V6.5a1.5 1.5 0 0 1 3 0V11" /><path d="M10 10V5a1.5 1.5 0 0 1 3 0v5" /><path d="M13 10V6a1.5 1.5 0 0 1 3 0v6" /><path d="M16 11a1.5 1.5 0 0 1 3 0v3a7 7 0 0 1-7 7h-1a6 6 0 0 1-5-3l-2.4-4a1.5 1.5 0 0 1 2.6-1.5L7 14" /></Svg>;
 const IconSprig = (p) => <Svg {...p}><path d="M12 21V5" /><path d="M12 8c-2 0-4-1.5-4-4 2 0 4 1.5 4 4Z" /><path d="M12 12c2 0 4-1.5 4-4-2 0-4 1.5-4 4Z" /><path d="M12 16c-2 0-4-1.5-4-4 2 0 4 1.5 4 4Z" /></Svg>;
 const IconAlert = (p) => <Svg {...p}><path d="M12 4 2.5 20h19L12 4Z" /><line x1="12" y1="10" x2="12" y2="14" /><circle cx="12" cy="17" r="0.6" fill="currentColor" /></Svg>;
+const INSTAGRAM_URL = 'https://www.instagram.com/seiva_aromas/';
+const INSTAGRAM_HANDLE = '@seiva_aromas';
+const IconInsta = (p) => <Svg {...p}><rect x="3.5" y="3.5" width="17" height="17" rx="5" /><circle cx="12" cy="12" r="4" /><circle cx="17.2" cy="6.8" r="0.9" fill="currentColor" stroke="none" /></Svg>;
 const IconWhats = (p) => <Svg {...p}><path d="M4 20l1.3-3.9A8 8 0 1 1 8 18.8L4 20Z" /><path d="M9 9.5c0 3 2.5 5.5 5.5 5.5l1-1.5-2-1-1 .8a4 4 0 0 1-2-2l.8-1-1-2L9 9.5Z" /></Svg>;
 const Star8 = ({ size = 14, color = '#C89A3D' }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1l1.6 7.4L21 5l-4.4 6.4L23 12l-6.4 1.6L21 19l-7.4-3.4L12 23l-1.6-7.4L3 19l4.4-5.4L1 12l6.4-.6L3 5l7.4 3.4L12 1Z" fill={color} /></svg>
@@ -444,6 +449,7 @@ function SiteHeader({ categories, itemCount, onOpenCart, onOpenMenu, onGoCategor
           <button className="nav-link" onClick={() => document.getElementById('cuidados')?.scrollIntoView({ behavior: 'smooth' })}>Cuidados</button>
         </nav>
         <div className="flex items-center gap-0.5">
+          <span className="hidden md:inline-flex"><a className="icon-btn" href={INSTAGRAM_URL} target="_blank" rel="noopener" aria-label="Instagram da Seiva Aromas" title={INSTAGRAM_HANDLE}><IconInsta size={21} /></a></span>
           <span className="hidden md:inline-flex"><MusicButton playing={music.playing} onToggle={music.toggle} /></span>
           <button className="icon-btn" onClick={onSearch} aria-label="Buscar"><IconSearch size={21} /></button>
           <button className="icon-btn relative" onClick={onOpenCart} aria-label="Sacola">
@@ -474,6 +480,7 @@ function MobileMenu({ open, categories, onClose, onGoCategory, onHome }) {
           <div className="h-px mx-5 my-3" style={{ background: '#E4D9C4' }} />
           <button className="menu-link" onClick={() => go(() => document.getElementById('historia')?.scrollIntoView({ behavior: 'smooth' }))}>Nossa história</button>
           <button className="menu-link" onClick={() => go(() => document.getElementById('cuidados')?.scrollIntoView({ behavior: 'smooth' }))}>Cuidados</button>
+          <a className="menu-link" href={INSTAGRAM_URL} target="_blank" rel="noopener"><span className="flex items-center gap-3"><IconInsta size={22} /> Instagram</span><span className="f-body text-[12px]" style={{ color: '#7A4B2A' }}>{INSTAGRAM_HANDLE}</span></a>
         </nav>
         <div className="mt-auto px-5 pb-6 pt-4 text-center" style={{ paddingBottom: 'calc(24px + env(safe-area-inset-bottom))' }}>
           <Ornament className="mb-3" />
@@ -767,9 +774,12 @@ function SiteFooter({ whatsapp }) {
         <img src={BRAND_LOGO_GOLD} alt={BRAND_NAME} className="h-32 w-auto mx-auto" />
         <p className="f-display italic text-[22px] mt-5" style={{ color: '#E8CF95' }}>Mais vida em cada aroma.</p>
         <p className="f-body text-[11px] tracking-[0.3em] uppercase mt-3" style={{ color: '#E9E3D0' }}>Pequenos rituais · grandes transformações</p>
-        {whatsapp && (
-          <a href={`https://wa.me/${String(whatsapp).replace(/\D/g, '')}`} target="_blank" rel="noopener" className="btn-cta-gold mt-7 inline-flex"><IconWhats size={18} /> Fale com a gente</a>
-        )}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 mt-7 max-w-xs sm:max-w-none mx-auto">
+          <a href={INSTAGRAM_URL} target="_blank" rel="noopener" className="btn-outline-light inline-flex justify-center"><IconInsta size={18} /> Siga {INSTAGRAM_HANDLE}</a>
+          {whatsapp && (
+            <a href={`https://wa.me/${String(whatsapp).replace(/\D/g, '')}`} target="_blank" rel="noopener" className="btn-cta-gold inline-flex justify-center"><IconWhats size={18} /> Fale com a gente</a>
+          )}
+        </div>
       </div>
       <div className="text-center f-body text-[11px] py-4" style={{ borderTop: '1px solid rgba(255,255,255,0.1)', color: '#DCD6BF', paddingBottom: 'calc(16px + env(safe-area-inset-bottom))' }}>
         © {new Date().getFullYear()} {BRAND_NAME}
@@ -1096,6 +1106,7 @@ function App() {
           </div>
           <Ornament className="mt-8" />
           <p className="f-body text-[13px] mt-4" style={{ color: '#7A4B2A' }}>Cada aroma abre um caminho para a magia.</p>
+          <a href={INSTAGRAM_URL} target="_blank" rel="noopener" className="inline-flex items-center gap-2 mt-6 f-body text-[13px] font-semibold" style={{ color: '#656149' }}><IconInsta size={18} /> Acompanhe os bastidores em {INSTAGRAM_HANDLE}</a>
         </div>
       </section>
 
