@@ -77,7 +77,7 @@ function Fonts() {
       .nav-link { font-family: 'Cormorant Garamond', serif; font-size: 17px; font-weight: 600; color: #1E1D1A; letter-spacing: 0.02em; position: relative; padding: 4px 0; white-space: nowrap; }
       .nav-link::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 1px; background: #C89A3D; transform: scaleX(0); transition: transform .25s ease; }
       .nav-link:hover::after { transform: scaleX(1); }
-      .icon-btn { width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; color: #314A3A; border-radius: 999px; flex-shrink: 0; }
+      .icon-btn { width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; color: #656149; border-radius: 999px; flex-shrink: 0; }
       .icon-btn:active { background: rgba(200,154,61,0.15); }
       .eq { display: inline-flex; align-items: flex-end; gap: 2px; height: 16px; }
       .eq i { width: 3px; background: #C89A3D; border-radius: 2px; animation: eq 1s ease-in-out infinite; }
@@ -108,10 +108,10 @@ function Fonts() {
       .hero-t2 { font-size: clamp(36px, 10.5vw, 60px); letter-spacing: 0.04em; color: #5E3A1F; }
       .hero-sub { color: #3B3A35; font-size: 14px; line-height: 1.6; margin-top: 12px; max-width: 360px; margin-left: auto; margin-right: auto; }
       @media (min-width: 768px) { .hero-sub { margin-left: 0; font-size: 15px; } }
-      .hero-arrow { position: absolute; top: 50%; transform: translateY(-50%); width: 44px; height: 44px; border-radius: 999px; align-items: center; justify-content: center; background: rgba(255,252,246,0.85); color: #314A3A; border: 1px solid #E4D9C4; }
+      .hero-arrow { position: absolute; top: 50%; transform: translateY(-50%); width: 44px; height: 44px; border-radius: 999px; align-items: center; justify-content: center; background: rgba(255,252,246,0.85); color: #656149; border: 1px solid #E4D9C4; }
       .hero-dot { height: 8px; border-radius: 999px; transition: width .25s ease, background .25s ease; }
-      .btn-cta { background: #314A3A; color: #FFFCF6; font-family: 'Montserrat', sans-serif; font-size: 12px; font-weight: 600; letter-spacing: 0.2em; text-transform: uppercase; padding: 15px 28px; border-radius: 4px; transition: background .2s ease; }
-      .btn-cta:hover { background: #24382B; }
+      .btn-cta { background: #656149; color: #FFFCF6; font-family: 'Montserrat', sans-serif; font-size: 12px; font-weight: 600; letter-spacing: 0.2em; text-transform: uppercase; padding: 15px 28px; border-radius: 4px; transition: background .2s ease; }
+      .btn-cta:hover { background: #4F4C38; }
       .btn-cta-gold { background: #C89A3D; color: #1E1D1A; font-family: 'Montserrat', sans-serif; font-size: 12px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; padding: 14px 24px; border-radius: 4px; align-items: center; gap: 8px; }
 
       /* coleções */
@@ -128,12 +128,12 @@ function Fonts() {
       .filter-wrap { position: sticky; top: calc(64px + env(safe-area-inset-top)); z-index: 20; background: rgba(247,242,232,0.96); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border-top: 1px solid #E4D9C4; border-bottom: 1px solid #E4D9C4; }
       .search-input { background: #FFFCF6; border: 1px solid #E4D9C4; color: #1E1D1A; padding: 11px 16px; font-size: 13px; outline: none; border-radius: 999px; font-family: 'Montserrat', sans-serif; }
       .search-input::placeholder { color: #9A9081; }
-      .search-input:focus { border-color: #314A3A; box-shadow: 0 0 0 3px rgba(200,154,61,0.25); }
+      .search-input:focus { border-color: #656149; box-shadow: 0 0 0 3px rgba(200,154,61,0.25); }
       .chip-row { scrollbar-width: none; -webkit-overflow-scrolling: touch; }
       .chip-row::-webkit-scrollbar { display: none; }
       .pill { font-family: 'Montserrat', sans-serif; font-size: 12.5px; font-weight: 500; padding: 9px 16px; border-radius: 999px; border: 1px solid #E4D9C4; color: #6E6558; background: #FFFCF6; white-space: nowrap; transition: all .15s ease; }
-      .pill.selected { background: #314A3A; color: #FFFCF6; border-color: #314A3A; font-weight: 600; }
-      .pill:hover:not(.selected) { border-color: #314A3A; color: #314A3A; }
+      .pill.selected { background: #656149; color: #FFFCF6; border-color: #656149; font-weight: 600; }
+      .pill:hover:not(.selected) { border-color: #656149; color: #656149; }
 
       /* cards */
       .product-card { animation: fadeUp .6s cubic-bezier(0.16,1,0.3,1) both; }
@@ -145,8 +145,8 @@ function Fonts() {
       .product-name { font-size: 19px; font-weight: 600; color: #1E1D1A; line-height: 1.12; text-transform: uppercase; letter-spacing: 0.03em; }
       @media (min-width: 640px) { .product-name { font-size: 21px; } }
       .price { font-size: 15px; font-weight: 600; color: #1E1D1A; }
-      .btn-card { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 42px; border-radius: 4px; border: 1px solid #314A3A; color: #314A3A; background: transparent; font-family: 'Montserrat', sans-serif; font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; transition: all .15s ease; }
-      .btn-card:hover:not(:disabled), .btn-card:active:not(:disabled) { background: #314A3A; color: #FFFCF6; }
+      .btn-card { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 42px; border-radius: 4px; border: 1px solid #656149; color: #656149; background: transparent; font-family: 'Montserrat', sans-serif; font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; transition: all .15s ease; }
+      .btn-card:hover:not(:disabled), .btn-card:active:not(:disabled) { background: #656149; color: #FFFCF6; }
       .btn-card:disabled { border-color: #E4D9C4; color: #9A9081; }
 
       /* página do produto */
@@ -160,10 +160,10 @@ function Fonts() {
       .pp-name { font-size: clamp(30px, 8vw, 36px); font-weight: 600; color: #1E1D1A; text-transform: uppercase; letter-spacing: 0.05em; line-height: 1.05; }
       .pp-price { font-size: 24px; font-weight: 600; color: #1E1D1A; }
       .opt-pill { font-family: 'Montserrat', sans-serif; font-size: 13px; font-weight: 500; padding: 10px 16px; min-height: 42px; border-radius: 999px; border: 1px solid #E4D9C4; color: #3B3A35; background: #FFFCF6; }
-      .opt-pill.selected { background: #314A3A; color: #FFFCF6; border-color: #314A3A; }
+      .opt-pill.selected { background: #656149; color: #FFFCF6; border-color: #656149; }
       .opt-pill:disabled { opacity: .4; text-decoration: line-through; }
       .stepper { display: inline-flex; align-items: center; border: 1px solid #E4D9C4; border-radius: 4px; background: #FFFCF6; height: 48px; }
-      .stepper button { width: 42px; height: 100%; font-size: 18px; color: #314A3A; }
+      .stepper button { width: 42px; height: 100%; font-size: 18px; color: #656149; }
       .stepper span { min-width: 26px; text-align: center; font-family: 'Montserrat', sans-serif; font-weight: 600; font-size: 14px; color: #1E1D1A; }
       .stepper-sm { height: 34px; } .stepper-sm button { width: 32px; font-size: 16px; }
       .facts { border-left: 1px solid #E4D9C4; }
@@ -178,21 +178,21 @@ function Fonts() {
       .buy-bar .btn-primary { font-size: 12px; letter-spacing: 0.05em; }
       .buy-bar { background: rgba(247,242,232,0.97); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border-top: 1px solid #E4D9C4; padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
 
-      .btn-primary { background: #314A3A; color: #FFFCF6; font-weight: 600; font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; padding: 14px 18px; min-height: 48px; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; gap: 9px; transition: background .2s ease; font-family: 'Montserrat', sans-serif; }
-      .btn-primary:hover:not(:disabled) { background: #24382B; }
+      .btn-primary { background: #656149; color: #FFFCF6; font-weight: 600; font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; padding: 14px 18px; min-height: 48px; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; gap: 9px; transition: background .2s ease; font-family: 'Montserrat', sans-serif; }
+      .btn-primary:hover:not(:disabled) { background: #4F4C38; }
       .btn-primary:disabled { opacity: .45; }
 
       /* história e cuidados */
       .story { background: #EFE6D2; border-top: 1px solid #E4D9C4; border-bottom: 1px solid #E4D9C4; }
-      .essence-tag { font-family: 'Cormorant Garamond', serif; font-size: 17px; font-weight: 600; color: #314A3A; border: 1px solid #C89A3D; border-radius: 999px; padding: 6px 16px; background: #F7F2E8; }
+      .essence-tag { font-family: 'Cormorant Garamond', serif; font-size: 17px; font-weight: 600; color: #656149; border: 1px solid #C89A3D; border-radius: 999px; padding: 6px 16px; background: #F7F2E8; }
       .care-card { display: flex; gap: 14px; background: #FFFCF6; border: 1px solid #E4D9C4; border-radius: 6px; padding: 18px; }
       .care-icon { color: #9C6F2B; flex-shrink: 0; margin-top: 3px; }
 
       /* sacola */
-      .bag-fab { bottom: calc(14px + env(safe-area-inset-bottom)); background: #314A3A; color: #FFFCF6; border-radius: 6px; padding: 15px 18px; box-shadow: 0 10px 30px rgba(30,29,26,0.25); animation: fadeUp .35s ease both; }
+      .bag-fab { bottom: calc(14px + env(safe-area-inset-bottom)); background: #656149; color: #FFFCF6; border-radius: 6px; padding: 15px 18px; box-shadow: 0 10px 30px rgba(30,29,26,0.25); animation: fadeUp .35s ease both; }
       .cart-sheet { background: #F7F2E8; border-radius: 16px 16px 0 0; animation: slideUp .3s cubic-bezier(0.16,1,0.3,1) both; max-height: 92vh; display: flex; flex-direction: column; }
       .fw-input { background: #FFFCF6; border: 1px solid #E4D9C4; color: #1E1D1A; padding: 11px 12px; font-size: 14px; outline: none; width: 100%; font-family: 'Montserrat', sans-serif; border-radius: 4px; min-height: 46px; }
-      .fw-input:focus { border-color: #314A3A; box-shadow: 0 0 0 3px rgba(200,154,61,0.25); }
+      .fw-input:focus { border-color: #656149; box-shadow: 0 0 0 3px rgba(200,154,61,0.25); }
       .fw-btn-ghost { background: #FFFCF6; border: 1px solid #E4D9C4; color: #6E6558; padding: 9px 16px; border-radius: 4px; font-size: 13px; font-weight: 600; font-family: 'Montserrat', sans-serif; display: inline-flex; align-items: center; justify-content: center; }
       .fw-btn-ghost:disabled { opacity: .5; }
 
@@ -230,21 +230,21 @@ function WelcomeBanner({ storeName, logoUrl, welcomeMessage, onClose, onMusic })
     >
       <div
         className="relative w-full max-w-sm welcome-card rounded-2xl"
-        style={{ backgroundColor: '#314A3A' }}
+        style={{ backgroundColor: '#656149' }}
         onClick={(e) => e.stopPropagation()}
       >
         <button
           onClick={onClose}
           aria-label="Fechar"
           className="absolute top-4 right-4 text-xl leading-none transition-colors"
-          style={{ color: '#C9D3C6', width: '44px', height: '44px', top: '8px', right: '8px' }}
+          style={{ color: '#E9E3D0', width: '44px', height: '44px', top: '8px', right: '8px' }}
         >✕</button>
         <div className="px-8 pt-10 pb-9 text-center">
           <img src={BRAND_LOGO_GOLD} alt={BRAND_NAME} className="h-32 w-auto mx-auto mb-5" />
-          <h2 className="f-display font-bold leading-tight" style={{ fontSize: '30px', color: '#C89A3D' }}>
+          <h2 className="f-display font-bold leading-tight" style={{ fontSize: '30px', color: '#E8CF95' }}>
             Boas-vindas!
           </h2>
-          <p className="f-body text-[14px] leading-relaxed mt-4" style={{ color: '#C9D3C6' }}>
+          <p className="f-body text-[14px] leading-relaxed mt-4" style={{ color: '#E9E3D0' }}>
             {welcomeMessage || 'Aproveite nosso catálogo com as últimas novidades.'}
           </p>
           <button onClick={onMusic} className="btn-cta-gold w-full mt-8 flex justify-center">
@@ -524,7 +524,7 @@ function Hero({ slides, onCta }) {
           <button className="hero-arrow left-3 sm:left-5 hidden sm:flex" onClick={() => setI((i - 1 + n) % n)} aria-label="Anterior"><IconChevronL size={22} /></button>
           <button className="hero-arrow right-3 sm:right-5 hidden sm:flex" onClick={() => setI((i + 1) % n)} aria-label="Próximo"><IconChevronR size={22} /></button>
           <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-2">
-            {slides.map((_, k) => <button key={k} onClick={() => setI(k)} aria-label={`Slide ${k + 1}`} className="hero-dot" style={{ background: k === i ? '#314A3A' : 'rgba(49,74,58,0.25)', width: k === i ? '22px' : '8px' }} />)}
+            {slides.map((_, k) => <button key={k} onClick={() => setI(k)} aria-label={`Slide ${k + 1}`} className="hero-dot" style={{ background: k === i ? '#656149' : 'rgba(101,97,73,0.25)', width: k === i ? '22px' : '8px' }} />)}
           </div>
         </>
       )}
@@ -546,7 +546,7 @@ function Collections({ items, onPick }) {
             <div className="flex-1 min-w-0 px-4 py-3">
               <div className="f-display collection-title">{c.name}</div>
               {c.blurb && <div className="hidden md:block f-body text-[12px] mt-1" style={{ color: '#6E6558' }}>{c.blurb}</div>}
-              <div className="hidden md:flex items-center gap-1.5 mt-2 f-body text-[12px] font-medium" style={{ color: '#314A3A' }}>Ver produtos <IconArrowR size={14} /></div>
+              <div className="hidden md:flex items-center gap-1.5 mt-2 f-body text-[12px] font-medium" style={{ color: '#656149' }}>Ver produtos <IconArrowR size={14} /></div>
             </div>
             <span className="md:hidden pr-3" style={{ color: '#9C6F2B' }}><IconChevronR size={18} /></span>
           </button>
@@ -697,7 +697,7 @@ function ProductPage({ product, isFav, onToggleFav, onClose, onAddToCart, onOpen
             {product.aromaNotes && <div className="f-display italic text-[17px] mt-2" style={{ color: '#7A4B2A' }}>{product.aromaNotes}</div>}
             {sizeText && <div className="f-body text-[13px] mt-0.5" style={{ color: '#6E6558' }}>{sizeText}</div>}
             <div className="f-body pp-price mt-3">{formatBRL(product.price)}</div>
-            {product.phrase && <p className="f-display italic text-[17px] mt-2" style={{ color: '#314A3A' }}>{product.phrase}</p>}
+            {product.phrase && <p className="f-display italic text-[17px] mt-2" style={{ color: '#656149' }}>{product.phrase}</p>}
 
             {aromas.length > 1 && (
               <div className="mt-5">
@@ -762,16 +762,16 @@ function ProductPage({ product, isFav, onToggleFav, onClose, onAddToCart, onOpen
 // ---------- Rodapé ----------
 function SiteFooter({ whatsapp }) {
   return (
-    <footer style={{ background: '#314A3A', color: '#E9E1CF' }}>
+    <footer style={{ background: '#656149', color: '#E9E1CF' }}>
       <div className="max-w-6xl mx-auto px-6 py-12 text-center">
         <img src={BRAND_LOGO_GOLD} alt={BRAND_NAME} className="h-32 w-auto mx-auto" />
-        <p className="f-display italic text-[22px] mt-5" style={{ color: '#C89A3D' }}>Mais vida em cada aroma.</p>
-        <p className="f-body text-[11px] tracking-[0.3em] uppercase mt-3" style={{ color: '#C9D3C6' }}>Pequenos rituais · grandes transformações</p>
+        <p className="f-display italic text-[22px] mt-5" style={{ color: '#E8CF95' }}>Mais vida em cada aroma.</p>
+        <p className="f-body text-[11px] tracking-[0.3em] uppercase mt-3" style={{ color: '#E9E3D0' }}>Pequenos rituais · grandes transformações</p>
         {whatsapp && (
           <a href={`https://wa.me/${String(whatsapp).replace(/\D/g, '')}`} target="_blank" rel="noopener" className="btn-cta-gold mt-7 inline-flex"><IconWhats size={18} /> Fale com a gente</a>
         )}
       </div>
-      <div className="text-center f-body text-[11px] py-4" style={{ borderTop: '1px solid rgba(255,255,255,0.1)', color: '#9FB0A2', paddingBottom: 'calc(16px + env(safe-area-inset-bottom))' }}>
+      <div className="text-center f-body text-[11px] py-4" style={{ borderTop: '1px solid rgba(255,255,255,0.1)', color: '#DCD6BF', paddingBottom: 'calc(16px + env(safe-area-inset-bottom))' }}>
         © {new Date().getFullYear()} {BRAND_NAME}
       </div>
     </footer>
@@ -1035,7 +1035,7 @@ function App() {
 
       {catalog.tagline && (
         <div className="max-w-6xl mx-auto px-6 pt-10 text-center">
-          <p className="f-display italic text-[22px] sm:text-[26px]" style={{ color: '#314A3A' }}>{catalog.tagline}</p>
+          <p className="f-display italic text-[22px] sm:text-[26px]" style={{ color: '#656149' }}>{catalog.tagline}</p>
         </div>
       )}
 
@@ -1070,7 +1070,7 @@ function App() {
           {filteredProducts.length === 0 ? (
             <div className="text-center py-16">
               <p className="f-display italic text-[20px]" style={{ color: '#7A4B2A' }}>Nenhum produto encontrado.</p>
-              <button onClick={goHome} className="f-body text-[13px] underline mt-2" style={{ color: '#314A3A' }}>Ver todos os produtos</button>
+              <button onClick={goHome} className="f-body text-[13px] underline mt-2" style={{ color: '#656149' }}>Ver todos os produtos</button>
             </div>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-3 sm:gap-x-6 gap-y-9 sm:gap-y-12">
@@ -1088,7 +1088,7 @@ function App() {
           <img src={BRAND_TREE} alt="" aria-hidden="true" className="w-16 sm:w-20 h-auto mx-auto mb-5" />
           <div className="eyebrow">Nossa história</div>
           <h2 className="f-display section-title mt-2">Da natureza para a sua essência</h2>
-          <p className="f-display italic text-[21px] sm:text-[24px] leading-snug mt-5" style={{ color: '#314A3A' }}>
+          <p className="f-display italic text-[21px] sm:text-[24px] leading-snug mt-5" style={{ color: '#656149' }}>
             Transformar pequenos momentos em rituais de presença, aroma e encantamento.
           </p>
           <div className="flex flex-wrap justify-center gap-2 mt-7">
@@ -1193,7 +1193,7 @@ function App() {
                 ) : (
                   <>
                     <input className="fw-input flex-1" placeholder="Cupom de desconto" value={couponCode} onChange={e => setCouponCode(e.target.value.toUpperCase().replace(/\s+/g, ''))} style={{ textTransform: 'uppercase' }} />
-                    <button onClick={applyCoupon} disabled={couponLoading || !couponCode.trim()} className="fw-btn-ghost" style={{ borderColor: '#314A3A', color: '#314A3A', minHeight: '46px' }}>{couponLoading ? 'Validando...' : 'Aplicar'}</button>
+                    <button onClick={applyCoupon} disabled={couponLoading || !couponCode.trim()} className="fw-btn-ghost" style={{ borderColor: '#656149', color: '#656149', minHeight: '46px' }}>{couponLoading ? 'Validando...' : 'Aplicar'}</button>
                   </>
                 )}
               </div>
