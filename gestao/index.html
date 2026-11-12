@@ -523,6 +523,9 @@ function App({ sb, session, onSignOut }) {
       if (error) throw error;
       setMissingCols(missing);
       setPublishState(missing.length ? 'published-partial' : 'published');
+      // Faxina: apaga do Supabase fotos e músicas que não são mais usadas (só depois de publicar,
+      // para o catálogo no ar nunca ficar apontando para um arquivo apagado).
+      cleanupUnusedFiles(sb, data).catch(err => console.warn('Faxina de arquivos não concluída:', err));
     } catch (e) {
       console.error('Erro ao publicar cat\u00e1logo:', e);
       setPublishState('error');
@@ -881,6 +884,35 @@ function EmptyState({ text }) {
   return <div className="h-full flex items-center justify-center text-sm text-slate-400">{text}</div>;
 }
 
+// ---------- Faxina de arquivos não usados ----------
+// Apaga do bucket "product-photos" os arquivos que não aparecem em nenhum lugar dos dados
+// (fotos de produto, fotos do banner, logo, música). Só mexe em arquivos com mais de 1 hora,
+// para nunca apagar algo que acabou de ser enviado e ainda não foi salvo.
+async function cleanupUnusedFiles(sb, data) {
+  const used = JSON.stringify(data || {});
+  const bucket = sb.storage.from('product-photos');
+  const cutoff = Date.now() - 60 * 60 * 1000;
+  const toDelete = [];
+  for (let offset = 0; offset < 20000; offset += 1000) {
+    const { data: files, error } = await bucket.list('', { limit: 1000, offset, sortBy: { column: 'name', order: 'asc' } });
+    if (error) throw error;
+    if (!files || files.length === 0) break;
+    for (const f of files) {
+      if (!f || !f.id || !f.name) continue;            // pastas não entram
+      const created = Date.parse(f.created_at || f.updated_at || '') || 0;
+      if (created > cutoff) continue;                  // muito recente: deixa quieto
+      if (used.includes(f.name)) continue;             // ainda em uso
+      toDelete.push(f.name);
+    }
+    if (files.length < 1000) break;
+  }
+  for (let i = 0; i < toDelete.length; i += 100) {
+    const { error } = await bucket.remove(toDelete.slice(i, i + 100));
+    if (error) throw error;
+  }
+  return toDelete.length;
+}
+
 // ---------- Products ----------
 function PhotoUploader({ sb, value, onChange }) {
   const [uploading, setUploading] = useState(false);
@@ -1198,7 +1230,7 @@ function MusicManager({ sb, settings, onChange }) {
     <div className="bg-white border border-slate-200 rounded-xl p-4">
       <p className="text-[13px] text-slate-600 mb-3 leading-relaxed">
         A música toca baixinho no catálogo a partir do primeiro toque do cliente na página. Use uma faixa calma, em MP3, liberada para uso comercial.
-        Depois de mudar, clique em <strong>Publicar catálogo agora</strong>.
+        Depois de mudar, clique em <strong>Publicar catálogo agora</strong> — a música antiga é apagada do Supabase automaticamente.
       </p>
       <div className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 rounded-lg mb-3" style={{ background: '#F7F2E8', border: '1px solid #EFE6D2' }}>
         <div className="min-w-0 flex-1">
