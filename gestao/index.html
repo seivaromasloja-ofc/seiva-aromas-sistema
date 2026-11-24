@@ -174,6 +174,8 @@ function Fonts() {
       .qty-step:disabled { color: #CFC6B4; }
       .qty-input { width: 56px; text-align: center; font-family: 'Montserrat', sans-serif; font-size: 17px; font-weight: 600; color: #1E1D1A; background: transparent; border: 0; outline: none; border-left: 1px solid #EFE6D2; border-right: 1px solid #EFE6D2; }
       .stock-row + .stock-row { border-top: 1px dashed #EFE6D2; }
+      .pay-chip { min-height: 42px; padding: 8px 14px; border-radius: 10px; border: 1px solid #E4D9C4; background: #FFFCF6; color: #3B3A35; font-size: 13px; font-weight: 500; }
+      .pay-chip[data-on='1'] { background: #656149; border-color: #656149; color: #fff; font-weight: 600; }
       @media (max-width: 767px) { .qty-input { font-size: 18px !important; width: 60px; } .qty-step { width: 48px; } .qty-field { height: 48px; } }
       @media (max-width: 767px) {
         .seiva-main { padding-bottom: calc(96px + env(safe-area-inset-bottom)) !important; }
@@ -421,7 +423,7 @@ function App({ sb, session, onSignOut }) {
       const newSale = { ...sale, id: uid('sale'), total, costTotal, profit: total - costTotal, financeId };
       const financeEntry = {
         id: financeId, date: sale.date, type: 'entrada', category: 'venda',
-        desc: `Venda${client ? ' - ' + client.name : ''} (${sale.type})`, value: total, auto: true
+        desc: `Venda${client ? ' - ' + client.name : ''} (${sale.type}${sale.payment ? ' · ' + paymentLabel(sale) : ''})`, value: total, auto: true
       };
       return { ...d, products, sales: [...d.sales, newSale], finance: [...d.finance, financeEntry] };
     });
@@ -1594,22 +1596,48 @@ function StockTab({ products, onSetStock, onUpdateProduct }) {
 }
 
 // ---------- Sales ----------
+const SALE_PAYMENTS = [
+  { value: 'pix', label: 'Pix' },
+  { value: 'dinheiro', label: 'Dinheiro' },
+  { value: 'credito', label: 'Cartão de crédito' },
+  { value: 'debito', label: 'Cartão de débito' },
+  { value: 'transferencia', label: 'Transferência' },
+  { value: 'outro', label: 'Outro' },
+];
+function paymentLabel(sale) {
+  if (!sale || !sale.payment) return '—';
+  const base = (SALE_PAYMENTS.find(p => p.value === sale.payment) || {}).label || sale.payment;
+  if (sale.payment === 'credito') return `Crédito ${sale.installments > 1 ? sale.installments + 'x' : 'à vista'}`;
+  if (sale.payment === 'debito') return 'Débito';
+  return base;
+}
+
 function SalesTab({ products, clients, sales, onRegister, onDelete }) {
   const [clientId, setClientId] = useState('');
   const [type, setType] = useState('varejo');
   const [date, setDate] = useState(todayISO());
+  const [payment, setPayment] = useState('pix');
+  const [installments, setInstallments] = useState(1);
   const [cart, setCart] = useState([]);
   const [pick, setPick] = useState({ productId: '', color: '', size: '', qty: 1 });
+  const [msg, setMsg] = useState(null);
 
   const selectedProduct = products.find(p => p.id === pick.productId);
   const colorsAvail = selectedProduct ? [...new Set(selectedProduct.variants.map(v => v.color))] : [];
   const sizesAvail = selectedProduct && pick.color ? [...new Set(selectedProduct.variants.filter(v => v.color === pick.color).map(v => v.size))] : [];
-  const variantAvail = selectedProduct && pick.color ? selectedProduct.variants.find(v => v.color === pick.color && v.size === pick.size) : null;
+  const variantAvail = selectedProduct && pick.color && pick.size ? selectedProduct.variants.find(v => v.color === pick.color && v.size === pick.size) : null;
+  const inCart = (pid, color, size) => cart.filter(i => i.productId === pid && i.color === color && i.size === size).reduce((n, i) => n + i.qty, 0);
+  const available = variantAvail ? Math.max(0, variantAvail.stock - inCart(pick.productId, pick.color, pick.size)) : 0;
+  const stockOf = (p, color) => p.variants.filter(v => v.color === color).reduce((n, v) => n + v.stock, 0);
+
+  const flash = (m, tone = 'ok') => { setMsg({ m, tone }); setTimeout(() => setMsg(null), 3500); };
 
   const addToCart = () => {
-    if (!selectedProduct || !pick.color || !pick.size || !pick.qty) return;
+    if (!selectedProduct || !pick.color || !pick.size) { flash('Escolha o produto, o aroma e o tamanho.', 'warn'); return; }
+    const qty = Math.max(1, parseInt(pick.qty, 10) || 1);
+    if (qty > available) { flash(available === 0 ? 'Esse item está sem estoque.' : `Só há ${available} em estoque desse item.`, 'warn'); return; }
     const price = type === 'atacado' ? selectedProduct.wholesale : selectedProduct.retail;
-    setCart(c => [...c, { productId: pick.productId, productName: selectedProduct.name, color: pick.color, size: pick.size, qty: Number(pick.qty), price }]);
+    setCart(c => [...c, { productId: pick.productId, productName: selectedProduct.name, color: pick.color, size: pick.size, qty, price }]);
     setPick({ productId: '', color: '', size: '', qty: 1 });
   };
   const removeFromCart = (i) => setCart(c => c.filter((_, idx) => idx !== i));
@@ -1618,15 +1646,19 @@ function SalesTab({ products, clients, sales, onRegister, onDelete }) {
   const submitSale = () => {
     if (cart.length === 0) return;
     const client = clients.find(c => c.id === clientId);
-    onRegister({ date, clientId: clientId || null, clientName: client ? client.name : 'Consumidor final', type, items: cart });
-    setCart([]);
+    const inst = payment === 'credito' ? Math.max(1, Number(installments) || 1) : 1;
+    onRegister({ date, clientId: clientId || null, clientName: client ? client.name : 'Consumidor final', type, items: cart, payment, installments: inst, channel: 'direta' });
+    setCart([]); setInstallments(1);
+    flash(`Venda de ${formatBRL(total)} registrada (${paymentLabel({ payment, installments: inst })}). Estoque atualizado.`);
   };
 
   return (
     <div>
-      <Section title="Registrar venda">
-        <div className="bg-white border border-slate-200 p-4 mb-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+      <Section title="Venda direta">
+        <p className="text-[13px] text-slate-500 -mt-1 mb-3">Para vendas fora do catálogo: loja, feira, encomenda pelo WhatsApp. O estoque é baixado automaticamente ao finalizar.</p>
+        <div className="bg-white border border-slate-200 rounded-xl p-4 mb-4">
+          {/* 1. Dados da venda */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
             <Field label="Data"><input type="date" className="fw-input" value={date} onChange={e => setDate(e.target.value)} /></Field>
             <Field label="Cliente">
               <select className="fw-input" value={clientId} onChange={e => setClientId(e.target.value)}>
@@ -1634,73 +1666,122 @@ function SalesTab({ products, clients, sales, onRegister, onDelete }) {
                 {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </Field>
-            <Field label="Tipo de venda">
-              <select className="fw-input" value={type} onChange={e => setType(e.target.value)}>
+            <Field label="Tabela de preço">
+              <select className="fw-input" value={type} onChange={e => { setType(e.target.value); setCart(c => c.map(i => { const p = products.find(x => x.id === i.productId); return p ? { ...i, price: e.target.value === 'atacado' ? p.wholesale : p.retail } : i; })); }}>
                 <option value="varejo">Varejo</option><option value="atacado">Atacado</option>
               </select>
             </Field>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end mb-3 border-t border-slate-200 pt-3">
-            <Field label="Produto">
-              <select className="fw-input" value={pick.productId} onChange={e => setPick({ productId: e.target.value, color: '', size: '', qty: 1 })}>
-                <option value="">Selecione</option>
-                {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
-            </Field>
-            <Field label="Aroma">
-              <select className="fw-input" value={pick.color} onChange={e => { const color = e.target.value; const s = selectedProduct ? [...new Set(selectedProduct.variants.filter(v => v.color === color).map(v => v.size))] : []; setPick(p => ({ ...p, color, size: s.length === 1 ? s[0] : '' })); }} disabled={!selectedProduct}>
-                <option value="">Selecione</option>
-                {colorsAvail.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </Field>
-            <Field label="Tamanho">
-              <select className="fw-input" value={pick.size} onChange={e => setPick(p => ({ ...p, size: e.target.value }))} disabled={!pick.color}>
-                <option value="">Selecione</option>
-                {sizesAvail.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </Field>
-            <Field label={`Qtd ${variantAvail ? `(disp: ${variantAvail.stock})` : ''}`}>
-              <input type="number" min="1" className="fw-input" value={pick.qty} onChange={e => setPick(p => ({ ...p, qty: e.target.value }))} />
-            </Field>
-            <button onClick={addToCart} className="fw-btn justify-center"><Plus size={14} />Adicionar item</button>
+          {/* 2. Itens */}
+          <div className="border-t border-slate-200 pt-4">
+            <div className="fw-display text-[18px] font-semibold mb-2" style={{ color: '#1E1D1A' }}>Produtos vendidos</div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[2fr_1.4fr_1fr_auto_auto] gap-3 items-end mb-3">
+              <Field label="Produto">
+                <select className="fw-input" value={pick.productId} onChange={e => {
+                  const p = products.find(x => x.id === e.target.value);
+                  const colors = p ? [...new Set(p.variants.map(v => v.color))] : [];
+                  const color = colors.length === 1 ? colors[0] : '';
+                  const sizes = p && color ? [...new Set(p.variants.filter(v => v.color === color).map(v => v.size))] : [];
+                  setPick({ productId: e.target.value, color, size: sizes.length === 1 ? sizes[0] : '', qty: 1 });
+                }}>
+                  <option value="">Selecione</option>
+                  {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </Field>
+              <Field label="Aroma">
+                <select className="fw-input" value={pick.color} onChange={e => { const color = e.target.value; const s = selectedProduct ? [...new Set(selectedProduct.variants.filter(v => v.color === color).map(v => v.size))] : []; setPick(p => ({ ...p, color, size: s.length === 1 ? s[0] : '' })); }} disabled={!selectedProduct}>
+                  <option value="">Selecione</option>
+                  {colorsAvail.map(c => <option key={c} value={c}>{c} ({stockOf(selectedProduct, c)} em estoque)</option>)}
+                </select>
+              </Field>
+              {sizesAvail.length > 1 || (sizesAvail.length === 1 && sizesAvail[0] !== SINGLE_SIZE) ? (
+                <Field label="Tamanho">
+                  <select className="fw-input" value={pick.size} onChange={e => setPick(p => ({ ...p, size: e.target.value }))} disabled={!pick.color}>
+                    <option value="">Selecione</option>
+                    {sizesAvail.map(s => { const v = selectedProduct.variants.find(x => x.color === pick.color && x.size === s); return <option key={s} value={s}>{s} ({v ? v.stock : 0})</option>; })}
+                  </select>
+                </Field>
+              ) : <div className="hidden lg:block" />}
+              <Field label={variantAvail ? `Qtd (disp. ${available})` : 'Qtd'}>
+                <QtyField value={pick.qty} label="quantidade" onCommit={n => setPick(p => ({ ...p, qty: Math.max(1, n) }))} />
+              </Field>
+              <button onClick={addToCart} className="fw-btn justify-center" style={{ minHeight: '44px' }}><Plus size={14} />Adicionar</button>
+            </div>
+            {selectedProduct && (
+              <div className="text-[12px] text-slate-500 -mt-1 mb-3">
+                Preço {type}: <strong className="text-slate-700">{formatBRL(type === 'atacado' ? selectedProduct.wholesale : selectedProduct.retail)}</strong>
+              </div>
+            )}
+
+            {cart.length > 0 && (
+              <div className="space-y-2 mb-2">
+                {cart.map((i, idx) => (
+                  <div key={idx} className="flex items-center justify-between gap-3 rounded-lg px-3 py-2.5" style={{ background: '#F7F2E8', border: '1px solid #EFE6D2' }}>
+                    <div className="min-w-0">
+                      <div className="fw-display text-[17px] font-semibold leading-tight truncate" style={{ color: '#1E1D1A' }}>{i.productName}</div>
+                      <div className="text-[12px] text-slate-500">{variantLabel(i.color, i.size)} · {i.qty} × {formatBRL(i.price)}</div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="fw-mono text-[14px] font-semibold text-slate-800">{formatBRL(i.price * i.qty)}</span>
+                      <button onClick={() => removeFromCart(idx)} className="fw-btn-ghost" style={{ minHeight: '36px' }} aria-label="Remover item"><X size={13} /></button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
+          {/* 3. Pagamento */}
           {cart.length > 0 && (
-            <div className="border-t border-slate-200 pt-3">
-              <table className="w-full fw-table">
-                <thead><tr><th>Produto</th><th>Aroma</th><th>Tam.</th><th>Qtd</th><th>Preço unit.</th><th>Subtotal</th><th></th></tr></thead>
-                <tbody>
-                  {cart.map((i, idx) => (
-                    <tr key={idx}>
-                      <td>{i.productName}</td><td>{i.color}</td><td>{i.size}</td><td>{i.qty}</td>
-                      <td>{formatBRL(i.price)}</td><td>{formatBRL(i.price * i.qty)}</td>
-                      <td><button onClick={() => removeFromCart(idx)} className="fw-btn-ghost"><X size={12} /></button></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <div className="flex items-center justify-between mt-3">
-                <div className="fw-mono text-slate-900 font-semibold text-lg">Total: {formatBRL(total)}</div>
-                <button onClick={submitSale} className="fw-btn"><Check size={14} />Finalizar venda</button>
+            <div className="border-t border-slate-200 pt-4 mt-3">
+              <div className="fw-display text-[18px] font-semibold mb-2" style={{ color: '#1E1D1A' }}>Pagamento</div>
+              <div className="flex flex-wrap gap-2 mb-3">
+                {SALE_PAYMENTS.map(p => (
+                  <button key={p.value} type="button" onClick={() => { setPayment(p.value); if (p.value !== 'credito') setInstallments(1); }}
+                    className="pay-chip" data-on={payment === p.value ? '1' : '0'}>{p.label}</button>
+                ))}
+              </div>
+              {payment === 'credito' && (
+                <div className="mb-3">
+                  <div className="text-[12px] text-slate-500 mb-1.5">Parcelas</div>
+                  <div className="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-12 gap-1.5">
+                    {Array.from({ length: 12 }, (_, k) => k + 1).map(n => (
+                      <button key={n} type="button" onClick={() => setInstallments(n)} className="pay-chip text-center" data-on={installments === n ? '1' : '0'}>
+                        {n === 1 ? 'À vista' : n + 'x'}
+                      </button>
+                    ))}
+                  </div>
+                  {installments > 1 && <div className="text-[12px] text-slate-500 mt-1.5">{installments}x de {formatBRL(total / installments)}</div>}
+                </div>
+              )}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
+                <div>
+                  <div className="text-[12px] text-slate-500">Total da venda</div>
+                  <div className="fw-mono text-slate-900 font-semibold text-[22px] leading-tight">{formatBRL(total)}</div>
+                </div>
+                <button onClick={submitSale} className="fw-btn justify-center" style={{ minHeight: '48px', fontSize: '14px' }}><Check size={16} />Finalizar venda</button>
               </div>
             </div>
           )}
+          {msg && <div className={`text-[13px] mt-3 rounded-lg px-3 py-2 ${msg.tone === 'warn' ? 'text-amber-800 bg-amber-50 border border-amber-200' : 'text-green-800 bg-green-50 border border-green-200'}`}>{msg.m}</div>}
         </div>
       </Section>
 
       <Section title="Histórico de vendas">
         <div className="bg-white border border-slate-200 overflow-x-auto">
           <table className="w-full fw-table">
-            <thead><tr><th>Data</th><th>Cliente</th><th>Tipo</th><th>Total</th><th>Lucro</th><th></th></tr></thead>
+            <thead><tr><th>Data</th><th>Cliente</th><th>Itens</th><th>Pagamento</th><th>Total</th><th>Lucro</th><th></th></tr></thead>
             <tbody>
-              {sales.length === 0 && <tr><td colSpan={6} className="text-slate-400 text-center py-6">Nenhuma venda registrada.</td></tr>}
+              {sales.length === 0 && <tr><td colSpan={7} className="text-slate-400 text-center py-6">Nenhuma venda registrada.</td></tr>}
               {[...sales].reverse().map(s => (
                 <tr key={s.id}>
-                  <td>{s.date}</td><td>{s.clientName}</td><td className="capitalize">{s.type}</td>
+                  <td>{s.date}</td><td>{s.clientName}</td>
+                  <td className="text-[12px]">{(s.items || []).map(i => `${i.qty}× ${i.productName}${i.color ? ' (' + variantLabel(i.color, i.size) + ')' : ''}`).join(', ')}</td>
+                  <td>{paymentLabel(s)}</td>
                   <td>{formatBRL(s.total)}</td>
                   <td className={s.profit >= 0 ? 'text-green-600' : 'text-red-600'}>{formatBRL(s.profit)}</td>
-                  <td><button onClick={() => onDelete(s.id)} className="fw-btn-ghost"><Trash2 size={13} /></button></td>
+                  <td><button onClick={() => { if (confirm('Excluir esta venda? Os itens voltam para o estoque.')) onDelete(s.id); }} className="fw-btn-ghost" aria-label="Excluir venda"><Trash2 size={13} /></button></td>
                 </tr>
               ))}
             </tbody>
@@ -2340,6 +2421,19 @@ function LoginScreen({ sb }) {
 
 function AuthGate({ sb }) {
   const [session, setSession] = useState(undefined);
+  const [allowed, setAllowed] = useState(undefined);
+
+  // Confere se o login está na lista da equipe (seiva-seguranca.sql).
+  // Se a lista ainda não foi criada no banco, libera como antes.
+  useEffect(() => {
+    if (!session) { setAllowed(undefined); return; }
+    let alive = true;
+    sb.rpc('is_team').then(({ data, error }) => {
+      if (!alive) return;
+      if (error) setAllowed(true); else setAllowed(data === true);
+    }).catch(() => alive && setAllowed(true));
+    return () => { alive = false; };
+  }, [session && session.user && session.user.id]);
 
   useEffect(() => {
     sb.auth.getSession().then(({ data }) => setSession(data.session));
@@ -2359,6 +2453,27 @@ function AuthGate({ sb }) {
 
   if (!session) {
     return <LoginScreen sb={sb} />;
+  }
+
+  if (allowed === undefined) {
+    return (
+      <div className="min-h-screen flex items-center justify-center fw-mono text-sm" style={{ backgroundColor: '#656149', color: '#E9E3D0' }}>
+        verificando acesso...
+      </div>
+    );
+  }
+
+  if (allowed === false) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6 fw-body" style={{ backgroundColor: '#656149' }}>
+        <div className="bg-white rounded-2xl p-6 max-w-sm w-full text-center">
+          <BrandMark variant="light" height="h-20" fontSize={17} />
+          <h1 className="fw-display text-[24px] font-semibold mt-4" style={{ color: '#1E1D1A' }}>Acesso não autorizado</h1>
+          <p className="text-[13px] text-slate-600 mt-2 leading-relaxed">O login <strong>{session.user && session.user.email}</strong> não faz parte da equipe da Seiva Aromas. Se você deveria ter acesso, peça para a responsável incluir o seu e-mail.</p>
+          <button onClick={() => sb.auth.signOut()} className="fw-btn w-full justify-center mt-5" style={{ minHeight: '46px' }}>Sair</button>
+        </div>
+      </div>
+    );
   }
 
   return <App sb={sb} session={session} onSignOut={() => sb.auth.signOut()} />;
