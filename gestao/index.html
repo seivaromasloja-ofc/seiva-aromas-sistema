@@ -1,4 +1,8 @@
 <!DOCTYPE html>
+<!-- ======================================================================
+     SEIVA AROMAS — ARQUIVO DO SISTEMA (gestão)
+     Lugar certo no GitHub: DENTRO da pasta  gestao/   →  gestao/index.html
+     ====================================================================== -->
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
@@ -1674,6 +1678,7 @@ function SalesTab({ products, clients, sales, onRegister, onDelete }) {
           </div>
 
           {/* 2. Itens */}
+          {cart.length === 0 && <div className="text-[12px] text-slate-500 mb-2">Escolha o produto, o aroma e a quantidade e toque em <strong>Adicionar</strong>. Depois selecione a forma de pagamento logo abaixo.</div>}
           <div className="border-t border-slate-200 pt-4">
             <div className="fw-display text-[18px] font-semibold mb-2" style={{ color: '#1E1D1A' }}>Produtos vendidos</div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[2fr_1.4fr_1fr_auto_auto] gap-3 items-end mb-3">
@@ -1732,8 +1737,8 @@ function SalesTab({ products, clients, sales, onRegister, onDelete }) {
             )}
           </div>
 
-          {/* 3. Pagamento */}
-          {cart.length > 0 && (
+          {/* 3. Pagamento (sempre visível) */}
+          {(
             <div className="border-t border-slate-200 pt-4 mt-3">
               <div className="fw-display text-[18px] font-semibold mb-2" style={{ color: '#1E1D1A' }}>Pagamento</div>
               <div className="flex flex-wrap gap-2 mb-3">
@@ -1760,7 +1765,7 @@ function SalesTab({ products, clients, sales, onRegister, onDelete }) {
                   <div className="text-[12px] text-slate-500">Total da venda</div>
                   <div className="fw-mono text-slate-900 font-semibold text-[22px] leading-tight">{formatBRL(total)}</div>
                 </div>
-                <button onClick={submitSale} className="fw-btn justify-center" style={{ minHeight: '48px', fontSize: '14px' }}><Check size={16} />Finalizar venda</button>
+                <button onClick={() => cart.length ? submitSale() : flash('Adicione pelo menos um produto antes de finalizar.', 'warn')} className="fw-btn justify-center" style={{ minHeight: '48px', fontSize: '14px', opacity: cart.length ? 1 : 0.55 }}><Check size={16} />Finalizar venda</button>
               </div>
             </div>
           )}
@@ -2419,6 +2424,17 @@ function LoginScreen({ sb }) {
   );
 }
 
+// Aviso se este arquivo (o SISTEMA) for colocado fora da pasta gestao por engano
+function WrongPlaceBar() {
+  const misplaced = !/\/gestao(\/|\/index\.html)?$/i.test(location.pathname);
+  if (!misplaced) return null;
+  return (
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9999, background: '#B91C1C', color: '#fff', padding: '10px 14px', fontSize: '13px', textAlign: 'center', fontFamily: 'Montserrat, sans-serif' }}>
+      Atenção: este é o arquivo do <strong>SISTEMA</strong>, mas ele está fora da pasta <strong>gestao</strong>. No GitHub, coloque-o em <strong>gestao/index.html</strong> e suba o arquivo do <strong>CATÁLOGO</strong> na raiz.
+    </div>
+  );
+}
+
 function AuthGate({ sb }) {
   const [session, setSession] = useState(undefined);
   const [allowed, setAllowed] = useState(undefined);
@@ -2452,7 +2468,7 @@ function AuthGate({ sb }) {
   }
 
   if (!session) {
-    return <LoginScreen sb={sb} />;
+    return <><WrongPlaceBar /><LoginScreen sb={sb} /></>;
   }
 
   if (allowed === undefined) {
@@ -2476,7 +2492,7 @@ function AuthGate({ sb }) {
     );
   }
 
-  return <App sb={sb} session={session} onSignOut={() => sb.auth.signOut()} />;
+  return <><WrongPlaceBar /><App sb={sb} session={session} onSignOut={() => sb.auth.signOut()} /></>;
 }
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
