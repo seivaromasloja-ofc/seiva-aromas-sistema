@@ -421,10 +421,12 @@ function App({ sb, session, onSignOut }) {
           costTotal += (prod.cost || 0) * item.qty;
         }
       });
-      const total = sale.items.reduce((s, i) => s + i.price * i.qty, 0);
+      const subtotal = sale.items.reduce((s, i) => s + i.price * i.qty, 0);
+      const discount = Math.min(subtotal, Math.max(0, Number(sale.discount) || 0));
+      const total = Math.round((subtotal - discount) * 100) / 100;
       const financeId = uid('fin');
       const client = d.clients.find(c => c.id === sale.clientId);
-      const newSale = { ...sale, id: uid('sale'), total, costTotal, profit: total - costTotal, financeId };
+      const newSale = { ...sale, id: uid('sale'), subtotal, discount, total, costTotal, profit: total - costTotal, financeId };
       const financeEntry = {
         id: financeId, date: sale.date, type: 'entrada', category: 'venda',
         desc: `Venda${client ? ' - ' + client.name : ''} (${sale.type}${sale.payment ? ' · ' + paymentLabel(sale) : ''})`, value: total, auto: true
@@ -1622,6 +1624,8 @@ function SalesTab({ products, clients, sales, onRegister, onDelete }) {
   const [date, setDate] = useState(todayISO());
   const [payment, setPayment] = useState('pix');
   const [installments, setInstallments] = useState(1);
+  const [discMode, setDiscMode] = useState('valor'); // 'valor' (R$) ou 'pct' (%)
+  const [discInput, setDiscInput] = useState('');
   const [cart, setCart] = useState([]);
   const [pick, setPick] = useState({ productId: '', color: '', size: '', qty: 1 });
   const [msg, setMsg] = useState(null);
@@ -1645,14 +1649,19 @@ function SalesTab({ products, clients, sales, onRegister, onDelete }) {
     setPick({ productId: '', color: '', size: '', qty: 1 });
   };
   const removeFromCart = (i) => setCart(c => c.filter((_, idx) => idx !== i));
-  const total = cart.reduce((s, i) => s + i.price * i.qty, 0);
+  const subtotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
+  const parseNum = (t) => { const str = String(t); const n = parseFloat(str.includes(',') ? str.replace(/\./g, '').replace(',', '.') : str); return isNaN(n) ? 0 : n; };
+  const discRaw = parseNum(discInput);
+  const discount = Math.min(subtotal, Math.max(0, discMode === 'pct' ? subtotal * Math.min(100, discRaw) / 100 : discRaw));
+  const total = Math.round((subtotal - discount) * 100) / 100;
+  const discountTooBig = discMode === 'pct' ? discRaw > 100 : discRaw > subtotal;
 
   const submitSale = () => {
     if (cart.length === 0) return;
     const client = clients.find(c => c.id === clientId);
     const inst = payment === 'credito' ? Math.max(1, Number(installments) || 1) : 1;
-    onRegister({ date, clientId: clientId || null, clientName: client ? client.name : 'Consumidor final', type, items: cart, payment, installments: inst, channel: 'direta' });
-    setCart([]); setInstallments(1);
+    onRegister({ date, clientId: clientId || null, clientName: client ? client.name : 'Consumidor final', type, items: cart, payment, installments: inst, channel: 'direta', discount: Math.round(discount * 100) / 100 });
+    setCart([]); setInstallments(1); setDiscInput('');
     flash(`Venda de ${formatBRL(total)} registrada (${paymentLabel({ payment, installments: inst })}). Estoque atualizado.`);
   };
 
@@ -1760,8 +1769,23 @@ function SalesTab({ products, clients, sales, onRegister, onDelete }) {
                   {installments > 1 && <div className="text-[12px] text-slate-500 mt-1.5">{installments}x de {formatBRL(total / installments)}</div>}
                 </div>
               )}
+              <div className="mb-3">
+                <div className="text-[12px] text-slate-500 mb-1.5">Desconto (opcional)</div>
+                <div className="flex items-stretch gap-2">
+                  <div className="flex rounded-[10px] overflow-hidden border" style={{ borderColor: '#E4D9C4' }}>
+                    {[['valor', 'R$'], ['pct', '%']].map(([m, l]) => (
+                      <button key={m} type="button" onClick={() => setDiscMode(m)} className="px-4 text-[14px] font-semibold" style={{ minHeight: '44px', background: discMode === m ? '#656149' : '#FFFCF6', color: discMode === m ? '#fff' : '#3B3A35' }}>{l}</button>
+                    ))}
+                  </div>
+                  <input className="fw-input" style={{ maxWidth: '160px' }} inputMode="decimal" placeholder={discMode === 'pct' ? 'Ex: 10' : 'Ex: 15,00'} value={discInput}
+                    onChange={e => setDiscInput(e.target.value.replace(/[^0-9.,]/g, '').slice(0, 10))} onFocus={e => e.target.select()} />
+                  {discInput && <button type="button" className="fw-btn-ghost" onClick={() => setDiscInput('')} aria-label="Tirar desconto" style={{ minHeight: '44px' }}><X size={13} /></button>}
+                </div>
+                {discountTooBig && <div className="text-[12px] text-amber-700 mt-1">O desconto não pode ser maior que o valor da venda — usei o valor total.</div>}
+              </div>
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
                 <div>
+                  {discount > 0 && <div className="text-[12px] text-slate-500">Subtotal <span className="line-through">{formatBRL(subtotal)}</span> · desconto {formatBRL(discount)}{discMode === 'pct' && discRaw > 0 ? ` (${Math.min(100, discRaw)}%)` : ''}</div>}
                   <div className="text-[12px] text-slate-500">Total da venda</div>
                   <div className="fw-mono text-slate-900 font-semibold text-[22px] leading-tight">{formatBRL(total)}</div>
                 </div>
@@ -1784,7 +1808,7 @@ function SalesTab({ products, clients, sales, onRegister, onDelete }) {
                   <td>{s.date}</td><td>{s.clientName}</td>
                   <td className="text-[12px]">{(s.items || []).map(i => `${i.qty}× ${i.productName}${i.color ? ' (' + variantLabel(i.color, i.size) + ')' : ''}`).join(', ')}</td>
                   <td>{paymentLabel(s)}</td>
-                  <td>{formatBRL(s.total)}</td>
+                  <td>{formatBRL(s.total)}{s.discount > 0 && <div className="text-[11px] text-slate-500">desconto {formatBRL(s.discount)}</div>}</td>
                   <td className={s.profit >= 0 ? 'text-green-600' : 'text-red-600'}>{formatBRL(s.profit)}</td>
                   <td><button onClick={() => { if (confirm('Excluir esta venda? Os itens voltam para o estoque.')) onDelete(s.id); }} className="fw-btn-ghost" aria-label="Excluir venda"><Trash2 size={13} /></button></td>
                 </tr>
